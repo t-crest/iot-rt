@@ -1,11 +1,15 @@
-default: tipsi
+# Makefile for tipsi
 
-tipsi.o: tipsi.c
-	gcc -std=c99 -c tipsi.c -o tipsi.o
+all: clean tipsi run
+
+tipsi.o: tipsi.c tipsi.h
+	gcc -std=c99 -c tipsi.c -o tipsi.o -I.
 
 tipsi: tipsi.o
 	gcc tipsi.o -o tipsi
 
+run: tipsi
+	./tipsi
+
 clean:
-	-rm -f tipsi.o
-	-rm -f tipsi
+	-rm -f tipsi.o tipsi.exe tipsi
