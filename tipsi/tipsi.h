@@ -5,8 +5,6 @@
 //
 // tipsi: Simulator for tcp etc. packets
 
-
-
 // real time info
 typedef struct { 
    unsigned int token_rt : 16;
