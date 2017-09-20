@@ -1,3 +1,3 @@
 
 doit:
-	sbt "runMain iotrt.BlaaHund"
+	sbt "runMain iotrt.BlaaHundServer"
