@@ -31,11 +31,7 @@ class BlaaHundServer {
 
       val blaa = in.next.split(" ")(1).substring(1).toLowerCase()
 
-      def isHexDec(c: Char) = {
-        (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
-      }
-
-      val okString = (blaa.filter(isHexDec)).length == blaa.length
+      val okString = (blaa.filter(Util.isHexDec)).length == blaa.length
       val msg = if (okString) {
         "You sent me a Blaa Hund package: " + blaa + "\n"
       } else {
@@ -68,14 +64,61 @@ class BlaaHundClient(host: String) {
     val s = new Socket(host, 80)
     val in = new BufferedSource(s.getInputStream())
     val out = new PrintStream(s.getOutputStream())
-    out.print("GET /abcde HTTP/1.1\r\nHost: "+host+"\r\n\r\n")
+    out.print("GET /abcde HTTP/1.1\r\nHost: " + host + "\r\n\r\n")
     in.getLines().foreach(println)
     s.close()
   }
 }
 
+object Util {
+  
+  def isHexDec(c: Char) = {
+    (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
+  }
+  
+  def toHex(buffer: Array[Byte]): String = {
+
+    def oneByte(b: Int): String = {
+      def hex(b: Int): Char = if (b >= 0 && b <= 9) (b + '0').toChar else (b - 10 + 'a').toChar
+
+      hex((b >> 4) & 0x0f).toString + hex(b & 0x0f).toString
+    }
+
+    var s = ""
+    buffer.foreach(x => s = s + oneByte(x.toInt))
+    s
+  }
+
+  def toBytes(s: String): Array[Byte] = {
+
+    val buf = new Array[Byte](s.length / 2)
+    
+    assert((s.filter(Util.isHexDec)).length == s.length)
+    
+    def oneByte(ch: Char, cl: Char): Byte = {
+      
+      def fromHex(c: Char): Int = if (c >='0' && c <='9') c-'0' else c-'a'+10
+
+      (fromHex(ch)*16 + fromHex(cl)).toByte
+    }
+    
+    for (i <- 0 until s.length/2) {
+      buf(i) = oneByte(s(i*2), s(i*2+1))
+    }
+
+    buf
+  }
+}
 object BlaaHundClient {
   def main(args: Array[String]) {
+
+    val buf = new Array[Byte](256)
+    for (i <- 0 until 256) {
+      buf(i) = i.toByte
+    }
+    val s = Util.toHex(buf)
+    println(s)
+    Util.toBytes(s).foreach(println)
     val c = new BlaaHundClient(args(0))
     c.run()
   }
