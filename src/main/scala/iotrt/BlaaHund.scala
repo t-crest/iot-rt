@@ -64,18 +64,39 @@ class BlaaHundClient(host: String) {
     val s = new Socket(host, 80)
     val in = new BufferedSource(s.getInputStream())
     val out = new PrintStream(s.getOutputStream())
-    out.print("GET /abcde HTTP/1.1\r\nHost: " + host + "\r\n\r\n")
+    val blaaPacket = "deadbeef"
+    out.print("GET /" + blaaPacket + " HTTP/1.1\r\nHost: " + host + "\r\n\r\n")
     in.getLines().foreach(println)
     s.close()
   }
 }
 
+class BlaaHund(host: String) extends LinkLayer {
+
+  val server = new BlaaHundServer()
+  val client = new BlaaHundClient(host)
+
+  // why can't we simple pass server into new Thread?
+  new Thread(new Runnable {
+    def run() {
+      server.run()
+    }
+  }).start
+  Thread.sleep(5000)
+  client.run()
+
+  // this should be called from the TCP/IP stack infrastructure periodically
+  def run() {
+
+  }
+}
+
 object Util {
-  
+
   def isHexDec(c: Char) = {
     (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
   }
-  
+
   def toHex(buffer: Array[Byte]): String = {
 
     def oneByte(b: Int): String = {
@@ -92,33 +113,35 @@ object Util {
   def toBytes(s: String): Array[Byte] = {
 
     val buf = new Array[Byte](s.length / 2)
-    
-    assert((s.filter(Util.isHexDec)).length == s.length)
-    
-    def oneByte(ch: Char, cl: Char): Byte = {
-      
-      def fromHex(c: Char): Int = if (c >='0' && c <='9') c-'0' else c-'a'+10
 
-      (fromHex(ch)*16 + fromHex(cl)).toByte
+    assert((s.filter(Util.isHexDec)).length == s.length)
+
+    def oneByte(ch: Char, cl: Char): Byte = {
+
+      def fromHex(c: Char): Int = if (c >= '0' && c <= '9') c - '0' else c - 'a' + 10
+
+      (fromHex(ch) * 16 + fromHex(cl)).toByte
     }
-    
-    for (i <- 0 until s.length/2) {
-      buf(i) = oneByte(s(i*2), s(i*2+1))
+
+    for (i <- 0 until s.length / 2) {
+      buf(i) = oneByte(s(i * 2), s(i * 2 + 1))
     }
 
     buf
   }
 }
+
+object BlaaHund {
+  def main(args: Array[String]) {
+
+    val c = new BlaaHund(args(0))
+    // c.run()
+  }
+}
+
 object BlaaHundClient {
   def main(args: Array[String]) {
 
-    val buf = new Array[Byte](256)
-    for (i <- 0 until 256) {
-      buf(i) = i.toByte
-    }
-    val s = Util.toHex(buf)
-    println(s)
-    Util.toBytes(s).foreach(println)
     val c = new BlaaHundClient(args(0))
     c.run()
   }
