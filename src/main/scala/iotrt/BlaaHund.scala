@@ -18,37 +18,37 @@ import scala.io._
 
 class BlaaHundServer {
 
+  println("Hello I am a simple RT IoT server!")
+  val server = new ServerSocket(8080)
+
+  // Should be caller periodically
   def run(): Unit = {
 
-    println("Hello I am a simple RT IoT server!")
-    val server = new ServerSocket(8080)
-    while (true) {
-      val s = server.accept()
-      println("Accepted connection")
+    val s = server.accept()
+    println("Accepted connection")
 
-      val in = new BufferedSource(s.getInputStream()).getLines()
-      val out = new PrintStream(s.getOutputStream())
+    val in = new BufferedSource(s.getInputStream()).getLines()
+    val out = new PrintStream(s.getOutputStream())
 
-      val blaa = in.next.split(" ")(1).substring(1).toLowerCase()
+    val blaa = in.next.split(" ")(1).substring(1).toLowerCase()
 
-      val okString = (blaa.filter(Util.isHexDec)).length == blaa.length
-      val msg = if (okString) {
-        "You sent me a Blaa Hund package: " + blaa + "\n"
-      } else {
-        "Your package is not a Blaa Hund package: " + blaa + "\n"
-      }
-      println(msg)
-
-      val resp = "HTTP/1.0 200 OK\r\n\r\n" +
-        "<html><head></head><body><h2>Hello Real-Time IoT World!</h2>" +
-        msg +
-        "</body></html>\r\n\r\n"
-
-      out.print(resp)
-      out.flush()
-      println("Close connection");
-      s.close()
+    val okString = (blaa.filter(Util.isHexDec)).length == blaa.length
+    val msg = if (okString) {
+      "You sent me a Blaa Hund package: " + blaa + "\n"
+    } else {
+      "Your package is not a Blaa Hund package: " + blaa + "\n"
     }
+    println(msg)
+
+    val resp = "HTTP/1.0 200 OK\r\n\r\n" +
+      "<html><head></head><body><h2>Hello Real-Time IoT World!</h2>" +
+      msg +
+      "</body></html>\r\n\r\n"
+
+    out.print(resp)
+    out.flush()
+    println("Close connection");
+    s.close()
   }
 }
 
