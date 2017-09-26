@@ -10,4 +10,4 @@ client:
 
 
 app:
-	sbt "runMain tpip.App"
+	sbt "runMain tpip.App dbaa8026.ngrok.io"

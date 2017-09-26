@@ -16,12 +16,43 @@ import scala.io._
  * We call this virtual link layer Blaa Hund.
  */
 
-class BlaaHundServer {
+class BlaaHund(host: String) extends LinkLayer {
 
-  println("Hello I am a simple RT IoT server!")
+  val correctGet = "GET /index.html HTTP/1.1\r\n" +
+    "Host: www.example.com\r\n\r\n"
+  val http10Get = "GET /index.html HTTP/1.0\r\n\r\n"
+
+  println("Hello I am a simple Blaa Hund server!")
   val server = new ServerSocket(8080)
 
-  // This shall run in it's own thread as it is blocking
+  // why can't we simple pass server into a new Thread?
+  new Thread(new Runnable {
+    def run() {
+      serve()
+    }
+  }).start
+
+  // this should be called from the TCP/IP stack infrastructure periodically
+  // contains the client code
+  def run(): Unit = {
+
+    if (!txQueue.empty) {
+      println("Client got a packet to send")
+      val p = txQueue.deq()
+      val blaaPacket = Util.toHex(p.buf, p.len)
+      
+      val inetAddress = InetAddress.getByName(host)
+      println(inetAddress)
+      val s = new Socket(host, 80)
+      val in = new BufferedSource(s.getInputStream())
+      val out = new PrintStream(s.getOutputStream())
+      out.print("GET /" + blaaPacket + " HTTP/1.1\r\nHost: " + host + "\r\n\r\n")
+      in.getLines().foreach(println)
+      s.close()
+    }
+  }
+
+  // This shall run in it's own thread as it is blocking on accept
   def serve(): Unit = {
 
     while (true) {
@@ -33,6 +64,13 @@ class BlaaHundServer {
       val out = new PrintStream(s.getOutputStream())
 
       val blaa = in.next.split(" ")(1).substring(1).toLowerCase()
+
+      val p = Packet.freePool.deq()
+      if (p != null) {
+        p.set(Util.toBytes(blaa))
+      } else {
+        println("No free buffers, packet dropped")
+      }
 
       val okString = (blaa.filter(Util.isHexDec)).length == blaa.length
       val msg = if (okString) {
@@ -54,43 +92,7 @@ class BlaaHundServer {
     }
 
   }
-}
 
-class BlaaHundClient(host: String) {
-
-  val correctGet = "GET /index.html HTTP/1.1\r\n" +
-    "Host: www.example.com\r\n\r\n"
-  val http10Get = "GET /index.html HTTP/1.0\r\n\r\n"
-
-  def run(): Unit = {
-    val inetAddress = InetAddress.getByName(host)
-    println(inetAddress)
-    val s = new Socket(host, 80)
-    val in = new BufferedSource(s.getInputStream())
-    val out = new PrintStream(s.getOutputStream())
-    val blaaPacket = "deadbeef"
-    out.print("GET /" + blaaPacket + " HTTP/1.1\r\nHost: " + host + "\r\n\r\n")
-    in.getLines().foreach(println)
-    s.close()
-  }
-}
-
-class BlaaHund(host: String) extends LinkLayer {
-
-  val server = new BlaaHundServer()
-  val client = new BlaaHundClient(host)
-
-  // why can't we simple pass server into a new Thread?
-  new Thread(new Runnable {
-    def run() {
-      server.serve()
-    }
-  }).start
-
-  // this should be called from the TCP/IP stack infrastructure periodically
-  def run() {
-
-  }
 }
 
 object Util {
@@ -99,7 +101,7 @@ object Util {
     (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
   }
 
-  def toHex(buffer: Array[Byte]): String = {
+  def toHex(buffer: Array[Byte], len: Int): String = {
 
     def oneByte(b: Int): String = {
       def hex(b: Int): Char = if (b >= 0 && b <= 9) (b + '0').toChar else (b - 10 + 'a').toChar
@@ -108,7 +110,9 @@ object Util {
     }
 
     var s = ""
-    buffer.foreach(x => s = s + oneByte(x.toInt))
+    for (i <- 0 until len) {
+      s = s + oneByte(buffer(i))
+    }
     s
   }
 
@@ -141,21 +145,7 @@ object BlaaHund {
   }
 }
 
-object BlaaHundClient {
-  def main(args: Array[String]) {
 
-    val c = new BlaaHundClient(args(0))
-    c.run()
-  }
-}
-
-object BlaaHundServer {
-
-  def main(args: Array[String]) {
-    val s = new BlaaHundServer()
-    s.serve()
-  }
-}
 
   /*
  * a complete response would be:
