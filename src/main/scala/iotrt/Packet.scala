@@ -6,7 +6,6 @@ class Packet {
 
   val buf = new Array[Byte](MAX_LEN)
   val len = 0
-  
 }
 
 object Packet {

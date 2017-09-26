@@ -21,34 +21,38 @@ class BlaaHundServer {
   println("Hello I am a simple RT IoT server!")
   val server = new ServerSocket(8080)
 
-  // Should be caller periodically
-  def run(): Unit = {
+  // This shall run in it's own thread as it is blocking
+  def serve(): Unit = {
 
-    val s = server.accept()
-    println("Accepted connection")
+    while (true) {
 
-    val in = new BufferedSource(s.getInputStream()).getLines()
-    val out = new PrintStream(s.getOutputStream())
+      val s = server.accept()
+      println("Accepted connection")
 
-    val blaa = in.next.split(" ")(1).substring(1).toLowerCase()
+      val in = new BufferedSource(s.getInputStream()).getLines()
+      val out = new PrintStream(s.getOutputStream())
 
-    val okString = (blaa.filter(Util.isHexDec)).length == blaa.length
-    val msg = if (okString) {
-      "You sent me a Blaa Hund package: " + blaa + "\n"
-    } else {
-      "Your package is not a Blaa Hund package: " + blaa + "\n"
+      val blaa = in.next.split(" ")(1).substring(1).toLowerCase()
+
+      val okString = (blaa.filter(Util.isHexDec)).length == blaa.length
+      val msg = if (okString) {
+        "You sent me a Blaa Hund package: " + blaa + "\n"
+      } else {
+        "Your package is not a Blaa Hund package: " + blaa + "\n"
+      }
+      println(msg)
+
+      val resp = "HTTP/1.0 200 OK\r\n\r\n" +
+        "<html><head></head><body><h2>Hello Real-Time IoT World!</h2>" +
+        msg +
+        "</body></html>\r\n\r\n"
+
+      out.print(resp)
+      out.flush()
+      println("Close connection");
+      s.close()
     }
-    println(msg)
 
-    val resp = "HTTP/1.0 200 OK\r\n\r\n" +
-      "<html><head></head><body><h2>Hello Real-Time IoT World!</h2>" +
-      msg +
-      "</body></html>\r\n\r\n"
-
-    out.print(resp)
-    out.flush()
-    println("Close connection");
-    s.close()
   }
 }
 
@@ -76,14 +80,12 @@ class BlaaHund(host: String) extends LinkLayer {
   val server = new BlaaHundServer()
   val client = new BlaaHundClient(host)
 
-  // why can't we simple pass server into new Thread?
+  // why can't we simple pass server into a new Thread?
   new Thread(new Runnable {
     def run() {
-      server.run()
+      server.serve()
     }
   }).start
-  Thread.sleep(5000)
-  client.run()
 
   // this should be called from the TCP/IP stack infrastructure periodically
   def run() {
@@ -151,7 +153,7 @@ object BlaaHundServer {
 
   def main(args: Array[String]) {
     val s = new BlaaHundServer()
-    s.run()
+    s.serve()
   }
 }
 

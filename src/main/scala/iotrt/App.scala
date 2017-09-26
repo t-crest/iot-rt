@@ -14,6 +14,6 @@ object App extends App {
   while (true) {
     println("ping")
     Thread.sleep(100)
-    server.run()
+//    server.run()
   }
 }
