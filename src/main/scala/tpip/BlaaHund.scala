@@ -5,6 +5,8 @@ import java.net._
 import java.io._
 import scala.io._
 
+// Suggestion: We do not use a 2 byte length encoding (see line 12 below)
+
 /**
  * We use a virtual link layer by sending an IP packet via
  * a HTTP GET request. The packet has a 2 byte header encoding
