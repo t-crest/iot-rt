@@ -13,11 +13,11 @@ object App extends App {
   // It is not correct as we wait a constant time and not for the next period.
   var i = 0
   while (true) {
-    println("ping")
+//    println("ping")
     Thread.sleep(1000)
     tpip.run()
     i += 1
-    if (i==5) {
+    if (i == -1) {
       val p = Packet.freePool.deq
       p.buf(0) = 0xab.toByte
       p.buf(1) = 0xcd.toByte

@@ -41,6 +41,7 @@ class BlaaHund(host: String) extends LinkLayer {
     if (!txQueue.empty) {
       println("Client got a packet to send")
       val p = txQueue.deq()
+      println(p)
       val blaaPacket = Util.toHex(p.buf, p.len)
       
       val inetAddress = InetAddress.getByName(host)
@@ -73,6 +74,7 @@ class BlaaHund(host: String) extends LinkLayer {
       } else {
         println("No free buffers, packet dropped")
       }
+      rxQueue.enq(p)
 
       val okString = (blaa.filter(Util.isHexDec)).length == blaa.length
       val msg = if (okString) {
@@ -115,6 +117,7 @@ object Util {
     for (i <- 0 until len) {
       s = s + oneByte(buffer(i))
     }
+    println(s)
     s
   }
 
