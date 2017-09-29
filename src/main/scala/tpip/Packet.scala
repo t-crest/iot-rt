@@ -15,21 +15,50 @@ class Packet {
       buf(i) = b(i)
     }
   }
-  
+
+  def setWord(pos: Int, word: Int): Unit = {
+    buf(pos) = (word >>> 24).toByte
+    buf(pos + 1) = (word >>> 16).toByte
+    buf(pos + 2) = (word >>> 8).toByte
+    buf(pos + 3) = word.toByte
+  }
+
+  def setHalfWord(pos: Int, hw: Int): Unit = {
+    buf(pos) = (hw >>> 8).toByte
+    buf(pos + 1) = hw.toByte
+  }
+
+  def getWord(pos: Int): Int = {
+    ((buf(pos).toInt & 0xff) << 24) +
+      ((buf(pos + 1).toInt & 0xff) << 16) +
+      ((buf(pos + 2).toInt & 0xff) << 8) +
+      ((buf(pos + 3).toInt & 0xff))
+  }
+
+  def getHalfWord(pos: Int): Int = {
+    (((buf(pos).toInt & 0xff) << 8) +
+      ((buf(pos + 1).toInt & 0xff))) & 0xffff
+  }
+
   def checkSum(off: Int, cnt: Int): Int = {
-    
+
     if ((cnt & 0x01) != 0) {
       buf(cnt) = 0
     }
     var sum = 0
-    for (i <- 0 until cnt/2) {
-      sum += ((buf(i*2)<<8) + buf(i*2+1) & 0xff) & 0xffff
+    for (i <- 0 until cnt / 2) {
+      sum += ((buf(i * 2) << 8) + buf(i * 2 + 1) & 0xff) & 0xffff
     }
-   while ((sum >> 16) != 0)
-			sum = (sum & 0xffff) + (sum >> 16)
-	
-		(~sum) & 0xffff
+    while ((sum >> 16) != 0)
+      sum = (sum & 0xffff) + (sum >> 16)
+
+    (~sum) & 0xffff
   }
+  
+//  overrides def toString: String = {
+//    var s = "Packet:\n"
+//    s
+//  }
 }
 
 object Packet {

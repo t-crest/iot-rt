@@ -15,41 +15,41 @@ class Tpip(host: String) extends Runnable {
   def run() = {
     ll.run()
     if (!ll.rxQueue.empty()) {
-      println("Do the ICMP")
-      val p = ll.rxQueue.deq()
-      receive(p)
+      Logger.log("Do the ICMP")
+      val p = receive(ll.rxQueue.deq())
       // just do ICMP ping reply without looking at the packet at all
-      ip.doIp(p, 0)
-      ll.txQueue.enq(p)
+      if (p != null) {
+        ip.doIp(p, 0)
+        ll.txQueue.enq(p)
+      }
     }
   }
 
   def receive(p: Packet): Packet = {
     val buf = p.buf
 
-    // using signed bytes for IP handling is painful
-    val len = (((buf(2).toInt & 0xff) << 8) + (buf(3).toInt & 0xff)) & 0xffff
+    val len = p.getHalfWord(2)
     if (len > p.len || buf(0) != 0x45) {
-      println("Too long or IP options -> drop it")
+      Logger.log("Too long or IP options -> drop it")
       Packet.freePool.enq(p)
       return null
     }
 
-    // do CheckSum
+    // todo CheckSum
     val prot = buf(9)
     if (prot == PROT_ICMP) {
       val typ = buf(20)
       val code = buf(21)
       if (typ == 8) {
-        println("Got a ping")
+        Logger.log("Got a ping")
         buf(20) = 0
       } else {
-        println("No ping -> I drop you")
+        Logger.log("No ping -> I drop you")
         Packet.freePool.enq(p)
         return null
       }
     } else {
-      println("I do not understand you -> I drop you")
+      Logger.log("I do not understand you -> I drop you")
       Packet.freePool.enq(p)
       return null
     }
