@@ -84,10 +84,13 @@ class BlaaHund(host: String) extends LinkLayer {
       }
       println(msg)
 
-      val resp = "HTTP/1.0 200 OK\r\n\r\n" +
-        "<html><head></head><body><h2>Hello Real-Time IoT World!</h2>" +
-        msg +
-        "</body></html>\r\n\r\n"
+      val resp = "HTTP/1.0 200 OK\r\n" +
+        "Content-type: text/html; charset=UTF-8\r\n\r\n" +
+        "Hello World in plain text\r\n" + msg + "\r\n\r\n"
+        
+//        "<html><head></head><body><h2>Hello Real-Time IoT World!</h2>" +
+//        msg +
+//        "</body></html>\r\n\r\n"
 
       out.print(resp)
       out.flush()
