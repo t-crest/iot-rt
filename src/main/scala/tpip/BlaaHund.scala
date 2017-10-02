@@ -26,6 +26,13 @@ class BlaaHund(host: String) extends LinkLayer {
 
   println("Hello I am a simple Blaa Hund server!")
   val server = new ServerSocket(8080)
+  
+  var logMsg = ""
+  def log(s: String): Unit = {
+    logMsg = s + logMsg + "\r\n"
+  }
+  
+  Logger.setLL(this)
 
   // why can't we simple pass server into a new Thread?
   new Thread(new Runnable {
@@ -76,17 +83,20 @@ class BlaaHund(host: String) extends LinkLayer {
       }
       rxQueue.enq(p)
 
+      logMsg = ""
       val okString = (blaa.filter(Util.isHexDec)).length == blaa.length
       val msg = if (okString) {
-        "You sent me a Blaa Hund package: " + blaa + "\n"
+        "You sent me a Blaa Hund package: " + blaa + "\r\n"
       } else {
-        "Your package is not a Blaa Hund package: " + blaa + "\n"
+        "Your package is not a Blaa Hund package: " + blaa + "\r\n"
       }
       println(msg)
+      Thread.sleep(1000)
+      
 
       val resp = "HTTP/1.0 200 OK\r\n" +
-        "Content-type: text/html; charset=UTF-8\r\n\r\n" +
-        "Hello World in plain text\r\n" + msg + "\r\n\r\n"
+        "Content-type: text/plain; charset=UTF-8\r\n\r\n" +
+        "Hello World in plain text\r\n" + msg + logMsg + "\r\n\r\n"
         
 //        "<html><head></head><body><h2>Hello Real-Time IoT World!</h2>" +
 //        msg +
