@@ -19,7 +19,7 @@ class Tpip(host: String) extends Runnable {
       val p = receive(ll.rxQueue.deq())
       // just do ICMP ping reply without looking at the packet at all
       if (p != null) {
-        ip.doIp(p, 0)
+        ip.doIp(p, PROT_ICMP)
         ll.txQueue.enq(p)
       }
     }
@@ -30,6 +30,7 @@ class Tpip(host: String) extends Runnable {
 
     val len = p.getHalfWord(2)
     if (len > p.len || buf(0) != 0x45) {
+      Logger.log("len " + len + " " +buf(0))
       Logger.log("Too long or IP options -> drop it")
       Packet.freePool.enq(p)
       return null

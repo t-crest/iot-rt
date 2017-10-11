@@ -22,6 +22,8 @@ class BlaaHund(host: String) extends LinkLayer {
 
   val correctGet = "GET /index.html HTTP/1.1\r\n" +
     "Host: www.example.com\r\n\r\n"
+  val correctRtPing = "GET /index.html HTTP/1.1\r\n" +
+    "Host: pingrt.ngrok.io\r\n\r\n"
   val http10Get = "GET /index.html HTTP/1.0\r\n\r\n"
 
   println("Hello I am a simple Blaa Hund server!")
@@ -50,13 +52,19 @@ class BlaaHund(host: String) extends LinkLayer {
       val p = txQueue.deq()
       println(p)
       val blaaPacket = Util.toHex(p.buf, p.len)
+      Packet.freePool.enq(p)
       
-      val inetAddress = InetAddress.getByName(host)
+      val lhost = "pingrt.ngrok.io" // host
+      val inetAddress = InetAddress.getByName(lhost)
       println(inetAddress)
-      val s = new Socket(host, 80)
+      val s = new Socket(lhost, 80)
       val in = new BufferedSource(s.getInputStream())
       val out = new PrintStream(s.getOutputStream())
-      out.print("GET /" + blaaPacket + " HTTP/1.1\r\nHost: " + host + "\r\n\r\n")
+      val requ = "GET /" + blaaPacket + " HTTP/1.1\r\nHost: " + lhost + "\r\n\r\n"
+      println("My GET:")
+      println(requ)
+      println("End my GET")
+      out.print(requ)
       in.getLines().foreach(println)
       s.close()
     }
