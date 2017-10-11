@@ -18,11 +18,11 @@ object App extends App {
     tpip.run()
     i += 1
     if (i == -1) {
-      val p = Packet.freePool.deq
+      val p = tpip.ll.txChannel.freePool.deq
       p.buf(0) = 0xab.toByte
       p.buf(1) = 0xcd.toByte
       p.len = 2
-      tpip.ll.txQueue.enq(p)
+      tpip.ll.txChannel.queue.enq(p)
     }
   }
 }

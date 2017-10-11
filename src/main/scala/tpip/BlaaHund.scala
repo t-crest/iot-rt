@@ -22,8 +22,6 @@ class BlaaHund(host: String) extends LinkLayer {
 
   val correctGet = "GET /index.html HTTP/1.1\r\n" +
     "Host: www.example.com\r\n\r\n"
-  val correctRtPing = "GET /index.html HTTP/1.1\r\n" +
-    "Host: pingrt.ngrok.io\r\n\r\n"
   val http10Get = "GET /index.html HTTP/1.0\r\n\r\n"
 
   println("Hello I am a simple Blaa Hund server!")
@@ -47,12 +45,13 @@ class BlaaHund(host: String) extends LinkLayer {
   // contains the client code
   def run(): Unit = {
 
-    if (!txQueue.empty) {
+    if (!txChannel.queue.empty) {
       println("Client got a packet to send")
-      val p = txQueue.deq()
+      val p = txChannel.queue.deq()
       println(p)
+      println("dest: " + p.getDest)
       val blaaPacket = Util.toHex(p.buf, p.len)
-      Packet.freePool.enq(p)
+      txChannel.freePool.enq(p)
       
       val lhost = "pingrt.ngrok.io" // host
       val inetAddress = InetAddress.getByName(lhost)
@@ -61,11 +60,9 @@ class BlaaHund(host: String) extends LinkLayer {
       val in = new BufferedSource(s.getInputStream())
       val out = new PrintStream(s.getOutputStream())
       val requ = "GET /" + blaaPacket + " HTTP/1.1\r\nHost: " + lhost + "\r\n\r\n"
-      println("My GET:")
-      println(requ)
-      println("End my GET")
-      out.print(requ)
+      println("before getLines - I might hang here as the connection is not closed by the server")
       in.getLines().foreach(println)
+      println("after getLines")
       s.close()
     }
   }
@@ -83,13 +80,14 @@ class BlaaHund(host: String) extends LinkLayer {
 
       val blaa = in.next.split(" ")(1).substring(1).toLowerCase()
 
-      val p = Packet.freePool.deq()
+      val p = rxChannel.freePool.deq()
       if (p != null) {
         p.set(Util.toBytes(blaa))
+        rxChannel.queue.enq(p)
       } else {
         println("No free buffers, packet dropped")
       }
-      rxQueue.enq(p)
+      println("rxChannel (in Blaa): "+ rxChannel.queue.cnt())
 
       logMsg = ""
       val okString = (blaa.filter(Util.isHexDec)).length == blaa.length

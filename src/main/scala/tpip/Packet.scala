@@ -15,6 +15,13 @@ class Packet {
       buf(i) = b(i)
     }
   }
+  
+  def copy(p: Packet): Unit = {
+    for (i <- 0 until p.len) {
+      buf(i) = p.buf(i)
+    }
+    len = p.len
+  }
 
   def setWord(pos: Int, word: Int): Unit = {
     buf(pos) = (word >>> 24).toByte
@@ -39,6 +46,11 @@ class Packet {
     (((buf(pos).toInt & 0xff) << 8) +
       ((buf(pos + 1).toInt & 0xff))) & 0xffff
   }
+  
+  def getSource = getWord(12)
+  def getDest = getWord(16)
+  def setSource(n: Int) = setWord(12, n)
+  def setDest(n: Int) = setWord(16, n)
 
   def checkSum(off: Int, cnt: Int): Int = {
 
@@ -59,12 +71,4 @@ class Packet {
 //    var s = "Packet:\n"
 //    s
 //  }
-}
-
-object Packet {
-
-  val MAX_PACKETS = 3
-  val freePool = new PacketQueue(MAX_PACKETS)
-
-  for (i <- 0 until MAX_PACKETS) freePool.enq(new Packet())
 }

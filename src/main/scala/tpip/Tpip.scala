@@ -13,15 +13,21 @@ class Tpip(host: String) extends Runnable {
 
   // Needs to be called periodically to keep things going
   def run() = {
+    println("Before ll.run()")
     ll.run()
-    if (!ll.rxQueue.empty()) {
+    println("rxChannel (in Tpip): " + ll.rxChannel.queue.cnt())
+
+    if (!ll.rxChannel.queue.empty()) {
       Logger.log("Do the ICMP")
-      val p = receive(ll.rxQueue.deq())
+      val pr = receive(ll.rxChannel.queue.deq())
       // just do ICMP ping reply without looking at the packet at all
-      if (p != null) {
-        ip.doIp(p, PROT_ICMP)
-        ll.txQueue.enq(p)
+      if (pr != null && !ll.txChannel.freePool.empty()) {
+        val ps = ll.txChannel.freePool.deq()
+        ps.copy(pr)
+        ip.doIp(ps, PROT_ICMP, pr.getDest, pr.getSource)
+        ll.txChannel.queue.enq(ps)
       }
+      ll.rxChannel.freePool.enq(pr)
     }
   }
 
@@ -30,9 +36,9 @@ class Tpip(host: String) extends Runnable {
 
     val len = p.getHalfWord(2)
     if (len > p.len || buf(0) != 0x45) {
-      Logger.log("len " + len + " " +buf(0))
+      Logger.log("len " + len + " " + buf(0))
       Logger.log("Too long or IP options -> drop it")
-      Packet.freePool.enq(p)
+      ll.rxChannel.freePool.enq(p)
       return null
     }
 
@@ -46,12 +52,12 @@ class Tpip(host: String) extends Runnable {
         buf(20) = 0
       } else {
         Logger.log("No ping -> I drop you")
-        Packet.freePool.enq(p)
+        ll.rxChannel.freePool.enq(p)
         return null
       }
     } else {
       Logger.log("I do not understand you -> I drop you")
-      Packet.freePool.enq(p)
+      ll.rxChannel.freePool.enq(p)
       return null
     }
     println(len)
