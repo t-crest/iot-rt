@@ -13,9 +13,7 @@ class Tpip(host: String) extends Runnable {
 
   // Needs to be called periodically to keep things going
   def run() = {
-    println("Before ll.run()")
     ll.run()
-    println("rxChannel (in Tpip): " + ll.rxChannel.queue.cnt())
 
     if (!ll.rxChannel.queue.empty()) {
       Logger.log("Do the ICMP")

@@ -5,12 +5,9 @@ import java.net._
 import java.io._
 import scala.io._
 
-// Suggestion: We do not use a 2 byte length encoding (see line 12 below)
-
 /**
  * We use a virtual link layer by sending an IP packet via
- * a HTTP GET request. The packet has a 2 byte header encoding
- * the length. The packet itself is encoded in hexadecimal
+ * a HTTP GET request. The packet itself is encoded in hexadecimal
  * and forms the URL for the GET request.
  *
  * Connection is closed after each GET request.
@@ -61,7 +58,8 @@ class BlaaHund(host: String) extends LinkLayer {
       val out = new PrintStream(s.getOutputStream())
       val requ = "GET /" + blaaPacket + " HTTP/1.1\r\nHost: " + lhost + "\r\n\r\n"
       println("before getLines - I might hang here as the connection is not closed by the server")
-      in.getLines().foreach(println)
+      println("For now I will not read the repsonse and close myself")
+      // in.getLines().foreach(println)
       println("after getLines")
       s.close()
     }
