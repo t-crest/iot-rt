@@ -40,13 +40,7 @@ class Ip {
       p.setWord(8, (0x20 << 24) + (prot << 16)) // ttl, protocol, clear checksum
       p.setSource(src)
       p.setDest(dest)
-      // swap ip addresses
       p.setHalfWord(10, p.checkSum(0, 20))
-
-          // p.llh[6] = 0x0800;
-
-      // send packet to the link layer for the packet
-      // p.interf.txQueue.enq(p);	
     }
   }
   

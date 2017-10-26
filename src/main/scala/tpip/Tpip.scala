@@ -3,10 +3,10 @@ package tpip
 /**
  * This is the main class for the tpIP stack
  */
-class Tpip(host: String) extends Runnable {
+class Tpip() extends Runnable {
 
   // Just hard code BlaaHund link layer
-  val ll: LinkLayer = new BlaaHund(host)
+  val ll: LinkLayer = new BlaaHund()
   val ip = new Ip()
 
   val PROT_ICMP = 1

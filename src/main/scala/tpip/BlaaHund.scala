@@ -15,11 +15,17 @@ import scala.io._
  * We call this virtual link layer Blaa Hund.
  */
 
-class BlaaHund(host: String) extends LinkLayer {
+class BlaaHund() extends LinkLayer {
 
   val correctGet = "GET /index.html HTTP/1.1\r\n" +
     "Host: www.example.com\r\n\r\n"
   val http10Get = "GET /index.html HTTP/1.0\r\n\r\n"
+  
+  val ipRasmus = 0x01020304
+  val ipMartin = 0x01020305
+  
+  val hostRasmus = "pingrt.ngrok.io"
+  val hostMartin = "iprt.ngrok.io"
 
   println("Hello I am a simple Blaa Hund server!")
   val server = new ServerSocket(8080)
@@ -48,19 +54,27 @@ class BlaaHund(host: String) extends LinkLayer {
       println(p)
       println("dest: " + p.getDest)
       val blaaPacket = Util.toHex(p.buf, p.len)
+      println("BlaaHund: "+blaaPacket)
       txChannel.freePool.enq(p)
       
-      val lhost = "pingrt.ngrok.io" // host
+      // Super dummy routing
+      val lhost = if (p.getDest == ipRasmus) hostRasmus else hostMartin
+      
       val inetAddress = InetAddress.getByName(lhost)
       println(inetAddress)
       val s = new Socket(lhost, 80)
       val in = new BufferedSource(s.getInputStream())
       val out = new PrintStream(s.getOutputStream())
       val requ = "GET /" + blaaPacket + " HTTP/1.1\r\nHost: " + lhost + "\r\n\r\n"
-      println("before getLines - I might hang here as the connection is not closed by the server")
-      println("For now I will not read the repsonse and close myself")
+      println(requ)
+      out.print(requ)
       // in.getLines().foreach(println)
-      println("after getLines")
+      val it = in.getLines()
+      println(it.next())
+      println(it.next())
+      println(it.next())
+      println(it.next())
+      println(it.next())
       s.close()
     }
   }
@@ -100,7 +114,7 @@ class BlaaHund(host: String) extends LinkLayer {
 
       val resp = "HTTP/1.0 200 OK\r\n" +
         "Content-type: text/plain; charset=UTF-8\r\n\r\n" +
-        "Hello World in plain text\r\n" + msg + logMsg + "\r\n\r\n"
+        "Hello World in plain text\r\n" + msg + logMsg
         
 //        "<html><head></head><body><h2>Hello Real-Time IoT World!</h2>" +
 //        msg +
@@ -158,16 +172,6 @@ object Util {
     buf
   }
 }
-
-object BlaaHund {
-  def main(args: Array[String]) {
-
-    val c = new BlaaHund(args(0))
-    // c.run()
-  }
-}
-
-
 
   /*
  * a complete response would be:

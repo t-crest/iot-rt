@@ -7,7 +7,7 @@ object Logger {
     ll = bh
   }
   def log(s: String) {
-    println(s)
+    println("log: "+s)
     ll.log(s)
   }
 }
