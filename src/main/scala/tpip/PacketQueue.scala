@@ -31,6 +31,7 @@ class PacketQueue(capacity: Int) {
 	 * @return the value or null
 	 */
 	def deq(): Packet = {
+	  println("Deq: free: "+cnt())
 		if (rdPtr==wrPtr) return null
 		var i =rdPtr
 		val p = data(i)

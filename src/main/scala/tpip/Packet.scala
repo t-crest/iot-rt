@@ -47,6 +47,14 @@ class Packet {
       ((buf(pos + 1).toInt & 0xff))) & 0xffff
   }
   
+  def getByte(pos: Int): Int = {
+    buf(pos).toInt & 0xff
+  }
+  
+  def setByte(pos: Int, b: Int): Unit = {
+    buf(pos) = b.toByte
+  }
+  
   def getSource = getWord(12)
   def getDest = getWord(16)
   def setSource(n: Int) = setWord(12, n)

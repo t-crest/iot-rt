@@ -17,7 +17,7 @@ object App extends App {
     Thread.sleep(1000)
     tpip.run()
     i += 1
-    if (i == 3) {
+    if (i == -1) {
       println("Send a ping")
       val p = tpip.ll.txChannel.freePool.deq
       p.buf(0) = 0xab.toByte

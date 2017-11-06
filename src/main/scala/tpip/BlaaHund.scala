@@ -21,8 +21,8 @@ class BlaaHund() extends LinkLayer {
     "Host: www.example.com\r\n\r\n"
   val http10Get = "GET /index.html HTTP/1.0\r\n\r\n"
   
-  val ipRasmus = 0x01020304
-  val ipMartin = 0x01020305
+  val ipRasmus = 0x0a000001
+  val ipMartin = 0x0a000002
   
   val hostRasmus = "pingrt.ngrok.io"
   val hostMartin = "iprt.ngrok.io"
@@ -53,12 +53,16 @@ class BlaaHund() extends LinkLayer {
       val p = txChannel.queue.deq()
       println(p)
       println("dest: " + p.getDest)
+      printf("dest: 0x%08x\n", p.getDest)
+      println("rasmus:" + ipRasmus)
+      println("martin:" + ipMartin)
       val blaaPacket = Util.toHex(p.buf, p.len)
       println("BlaaHund: "+blaaPacket)
       txChannel.freePool.enq(p)
       
       // Super dummy routing
-      val lhost = if (p.getDest == ipRasmus) hostRasmus else hostMartin
+      val lhost = if (p.getDest == ipRasmus || p.getDest == 0x10000001) hostRasmus else hostMartin
+      println("Sending to: " + lhost)
       
       val inetAddress = InetAddress.getByName(lhost)
       println(inetAddress)

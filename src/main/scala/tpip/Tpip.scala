@@ -10,20 +10,36 @@ class Tpip() extends Runnable {
   val ip = new Ip()
 
   val PROT_ICMP = 1
+  val ICMP_ECHO_REQUEST = 8
+  val ICMP_ECHO_REPLY = 0
 
   // Needs to be called periodically to keep things going
   def run() = {
     ll.run()
 
     if (!ll.rxChannel.queue.empty()) {
-      Logger.log("Do the ICMP")
       val pr = receive(ll.rxChannel.queue.deq())
       // just do ICMP ping reply without looking at the packet at all
-      if (pr != null && !ll.txChannel.freePool.empty()) {
-        val ps = ll.txChannel.freePool.deq()
-        ps.copy(pr)
-        ip.doIp(ps, PROT_ICMP, pr.getDest, pr.getSource)
-        ll.txChannel.queue.enq(ps)
+
+      if (pr != null) {
+        val prot = pr.getByte(9)
+        if (prot == PROT_ICMP) {
+          if (pr.getByte(20) == ICMP_ECHO_REQUEST) {
+            Logger.log("ICMP echo request: do the ICMP reply.")
+
+            if (!ll.txChannel.freePool.empty()) {
+              val ps = ll.txChannel.freePool.deq()
+              ps.copy(pr)
+              ps.setByte(20, ICMP_ECHO_REPLY)
+              ip.doIp(ps, PROT_ICMP, pr.getDest, pr.getSource)
+              ll.txChannel.queue.enq(ps)
+            }
+          } else {
+            Logger.log("Just got a ICMP echo reply. Nothing to do.")
+          }
+        } else {
+          Logger.log("Not yet handled protocol")
+        }
       }
       ll.rxChannel.freePool.enq(pr)
     }
@@ -41,24 +57,24 @@ class Tpip() extends Runnable {
     }
 
     // todo CheckSum
-    val prot = buf(9)
-    if (prot == PROT_ICMP) {
-      val typ = buf(20)
-      val code = buf(21)
-      if (typ == 8) {
-        Logger.log("Got a ping")
-        buf(20) = 0
-      } else {
-        Logger.log("No ping -> I drop you")
-        ll.rxChannel.freePool.enq(p)
-        return null
-      }
-    } else {
-      Logger.log("I do not understand you -> I drop you")
-      ll.rxChannel.freePool.enq(p)
-      return null
-    }
-    println(len)
+//    val prot = buf(9)
+//    if (prot == PROT_ICMP) {
+//      val typ = buf(20)
+//      val code = buf(21)
+//      if (typ == 8) {
+//        Logger.log("Got a ping")
+//        buf(20) = 0
+//      } else {
+//        Logger.log("No ping -> I drop you")
+//        ll.rxChannel.freePool.enq(p)
+//        return null
+//      }
+//    } else {
+//      Logger.log("I do not understand you -> I drop you")
+//      ll.rxChannel.freePool.enq(p)
+//      return null
+//    }
+//    println(len)
     p
   }
 
