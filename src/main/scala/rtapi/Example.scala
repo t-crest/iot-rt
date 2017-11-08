@@ -36,4 +36,5 @@ object Example extends App {
   val pi = new Ping(1000)
   val po = new Pong(3000)
   
+  RtThread.startMission()  
 }

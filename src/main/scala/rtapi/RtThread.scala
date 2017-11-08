@@ -2,21 +2,21 @@ package rtapi
 
 object RtThread {
 
-  // TODO have a list and start all threads at one point
-  //  val rtt
+  var rtt = List[RtThread]()
 
-  def startThreads(): Unit = {
-
+  def startMission(): Unit = {
+    val start = System.currentTimeMillis() + 300
+    rtt.foreach { x => x.next = start }
+    rtt.foreach { x => x.thread.start() }
   }
 }
 
 abstract class RtThread(period: Int) extends Runnable {
 
   var next = System.currentTimeMillis() + period
-
+  
   val thread = new Thread(this)
-
-  thread.start()
+  RtThread.rtt = this :: RtThread.rtt
 
   def waitForNextPeriod(): Unit = {
     next += period
