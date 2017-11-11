@@ -13,17 +13,27 @@ object RtThread {
 
 abstract class RtThread(period: Int) extends Runnable {
 
-  var next = System.currentTimeMillis() + period
+  var next = 0L // set on mission start
   
-  val thread = new Thread(this)
+  def runIt(): Unit = {
+    this.run()
+  }
+  
+  val thread = new Thread(new Runnable {
+    def run() = {
+      waitForNextPeriod()
+      runIt()
+    }
+  })
+  
   RtThread.rtt = this :: RtThread.rtt
 
   def waitForNextPeriod(): Unit = {
-    next += period
     val sleep = next - System.currentTimeMillis() - 5
     if (sleep > 0) Thread.sleep(sleep)
     while (System.currentTimeMillis() - next < 0) {
       ; // busy wait
     }
+    next += period
   }
 }

@@ -7,9 +7,6 @@ package rtapi
 class Ping(period: Int) extends RtThread(period) {
   
   def run(): Unit = {
-    // wait till start
-    waitForNextPeriod()
-    
     // the endless loop
     while (true) {
       println("ping")
@@ -21,9 +18,6 @@ class Ping(period: Int) extends RtThread(period) {
 class Pong(period: Int) extends RtThread(period) {
   
   def run(): Unit = {
-    // wait till start
-    waitForNextPeriod()
-    
     // the endless loop
     while (true) {
       println("pong")
