@@ -13,6 +13,9 @@
 // CONSTANT PARAMETERS SECTION
 //*****************************************************************************
 
+// period length (ms). Can also be cycles if on 'bare metal'
+#define PERIOD 1000
+
 // one 'BUF' is one packet/message
 // very important WCET parameter
 #define MAX_BUF_NUM 4
@@ -38,10 +41,16 @@ static int buf_bytes[MAX_BUF_NUM];
 // function for getting number of milliseconds since epoc (1970)
 // used with waitfornextperiod
 long long int currenttimemillis(){
-  struct timeval now; 
-  gettimeofday(&now, NULL);    
-  long long int msec = ((long long int) now.tv_sec) * 1000LL + (long long int) now.tv_usec / 1000LL;
+  struct timeval timenow; 
+  gettimeofday(&timenow, NULL);    
+  long long int msec = ((long long int) timenow.tv_sec) * 1000LL + (long long int) timenow.tv_usec / 1000LL;
   return msec;
+}
+
+// will block (by spinning) until next period
+void waitfornextperiod(){
+  long long int now = currenttimemillis();
+  while(currenttimemillis() - now < PERIOD);
 }
 
 //*****************************************************************************
@@ -60,7 +69,9 @@ long long int currenttimemillis(){
 int main() {
   printf("Hello tpip world!\n");
   
-  printf("Timer: %lld", currenttimemillis());
+  printf("Timer before 'waitforoneperiod()': %lld\n", currenttimemillis());
+  waitfornextperiod();
+  printf("Timer after 'waitforoneperiod()': %lld\n", currenttimemillis());
 
   return 0;
 }
