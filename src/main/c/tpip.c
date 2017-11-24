@@ -47,11 +47,31 @@ long long int currenttimemillis(){
   return msec;
 }
 
-// will block (by spinning) until next period
-void waitfornextperiod(){
+//spins for a number of ms
+void wait(int waittime){
   long long int now = currenttimemillis();
-  while(currenttimemillis() - now < PERIOD);
+  while((currenttimemillis() - now) < (long long int)waittime);
 }
+
+// init waitfornextperiod 
+// can be used in the beginning of a control loop
+static long long int _start = -1;
+void initwaitfornextperiod(){
+  _start = currenttimemillis();
+}
+
+// will block (by spinning) until next period
+// returns time since 'initwaitfornextperiod()' was called
+// if return value is greater then PERIOD, it might indicate a deadline problem
+long long int waitfornextperiod(){
+  long long int waitfor = PERIOD - ((currenttimemillis() - _start) % PERIOD);
+  wait(waitfor);
+  long long int totalwait = currenttimemillis() - _start;
+  _start = currenttimemillis();
+  return totalwait;
+}
+
+
 
 //*****************************************************************************
 // UDP SECTION
@@ -69,9 +89,19 @@ void waitfornextperiod(){
 int main() {
   printf("Hello tpip world!\n");
   
+  initwaitfornextperiod();
+  
   printf("Timer before 'waitforoneperiod()': %lld\n", currenttimemillis());
-  waitfornextperiod();
-  printf("Timer after 'waitforoneperiod()': %lld\n", currenttimemillis());
+  long long int elapsed = waitfornextperiod();
+  printf("Timer after 'waitforoneperiod()':  %lld\n", currenttimemillis());
+  printf("Elapsed time: %lld\n", elapsed);
+  
+  wait(1401);
+  
+  printf("Timer before 'waitforoneperiod()': %lld\n", currenttimemillis());
+  elapsed = waitfornextperiod();
+  printf("Timer after 'waitforoneperiod()':  %lld\n", currenttimemillis());
+  printf("Elapsed time: %lld\n", elapsed);
 
   return 0;
 }
