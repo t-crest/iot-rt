@@ -14,7 +14,7 @@
 //*****************************************************************************
 
 // period length (ms). Can also be cycles if on 'bare metal'
-#define PERIOD 1000
+#define PERIOD 1000 // must be less than 2,147,483,647 
 
 // one 'BUF' is one packet/message
 // very important WCET parameter
@@ -29,49 +29,54 @@ static int buf[MAX_BUF_NUM][MAX_BUF_SIZE/4];
 static int buf_bytes[MAX_BUF_NUM];
 
 //*****************************************************************************
-// FORWARD DECLARATIONS (on "need-to" basis)
+// FORWARD DECLARATIONS (only on a "need-to" basis)
 //*********************************************************************
 
-//void sizeinfo();
 
 //*****************************************************************************
 // UTILITIES SECTION
 //*****************************************************************************
 
-// function for getting number of milliseconds since epoc (1970)
+// function for getting number of milliseconds since "system-epoc"
 // used with waitfornextperiod
-long long int currenttimemillis(){
+int currenttimemillis(){
   struct timeval timenow; 
   gettimeofday(&timenow, NULL);    
-  long long int msec = ((long long int) timenow.tv_sec) * 1000LL + (long long int) timenow.tv_usec / 1000LL;
-  return msec;
+  long long int msec = ((long long int) timenow.tv_sec) * 1000LL 
+    + (long long int) timenow.tv_usec / 1000LL;
+  // push "epoc" from 1970 to now - approx. 277 hrs
+  //   to having 'long long int' everywhere
+  msec = msec - 1511e9; 
+  return (int)msec;
 }
 
 //spins for a number of ms
+//used by waitfornextperiod
+//note: similar to 'clock()' in time.h
 void wait(int waittime){
-  long long int now = currenttimemillis();
-  while((currenttimemillis() - now) < (long long int)waittime);
+  int now = currenttimemillis();
+  while(currenttimemillis()-now < waittime);
 }
 
 // init waitfornextperiod 
-// can be used in the beginning of a control loop
-static long long int _start = -1;
+static volatile int _start = -1; //Is 'volatile' needed here?
 void initwaitfornextperiod(){
   _start = currenttimemillis();
 }
 
 // will block (by spinning) until next period
-// returns time since 'initwaitfornextperiod()' was called
+// returns time since 'initwaitfornextperiod()' was called 
+//   so not including the rest of the PERIOD
 // if return value is greater then PERIOD, it might indicate a deadline problem
-long long int waitfornextperiod(){
-  long long int waitfor = PERIOD - ((currenttimemillis() - _start) % PERIOD);
+int waitfornextperiod(){
+  int totalwait = currenttimemillis() - _start;
+  int waitfor = PERIOD - ((currenttimemillis() - _start) % PERIOD);
   wait(waitfor);
-  long long int totalwait = currenttimemillis() - _start;
   _start = currenttimemillis();
   return totalwait;
 }
 
-
+//TODO: a 'timetonextperiod' function
 
 //*****************************************************************************
 // UDP SECTION
@@ -82,26 +87,49 @@ long long int waitfornextperiod(){
 //*****************************************************************************
 
 //*****************************************************************************
+// TEST SECTION: Temp. area to keep "ok" test code and misc. snippets
+//*****************************************************************************
+
+int timer_test() {
+  int res = 0;
+  printf("timer_test!\n");
+  printf("PERIOD: %d ms \n\n", PERIOD);
+  
+  //start timer
+  initwaitfornextperiod();
+  int before = currenttimemillis();
+  printf("Timer before 'waitforoneperiod()':  %10d ms \n", before);
+  int elapsed1 = waitfornextperiod();
+  int after = currenttimemillis();
+  printf("Timer after 'waitforoneperiod()':   %10d ms \n", after);
+  printf("Elapsed time since prev. wfnp call: %10d ms \n", elapsed1);
+  printf("Elapsed time since this wfnp call:  %10d ms \n\n", (after-before));
+  
+  // uncomment 'for'  loop to get a false test
+  //for(volatile int i = 0; i < 100000000; i++); // 'volatile' to avoid '-O2' optimization
+  wait(123); // 'wait(321)' will give a false test
+  printf("Timer before 'waitforoneperiod()':  %10d ms \n", currenttimemillis());
+  int elapsed2 = waitfornextperiod();
+  printf("Timer after 'waitforoneperiod()':   %10d ms \n", currenttimemillis());
+  printf("Elapsed time since prev. wfnp call: %10d ms \n", elapsed2);
+
+  // test result ok?
+  if (elapsed2 == 123)
+    res = 1;
+  printf("\ntimer_test result: %s\n", res ? "true" : "false"); 
+  return res;
+}
+
+
+//*****************************************************************************
 // MAIN SECTION: Place various "main" functions here and enable as needed
 //*****************************************************************************
 
 // Basic testing
 int main() {
-  printf("Hello tpip world!\n");
+  printf("Hello tpip world! \n\n");
   
-  initwaitfornextperiod();
-  
-  printf("Timer before 'waitforoneperiod()': %lld\n", currenttimemillis());
-  long long int elapsed = waitfornextperiod();
-  printf("Timer after 'waitforoneperiod()':  %lld\n", currenttimemillis());
-  printf("Elapsed time: %lld\n", elapsed);
-  
-  wait(1401);
-  
-  printf("Timer before 'waitforoneperiod()': %lld\n", currenttimemillis());
-  elapsed = waitfornextperiod();
-  printf("Timer after 'waitforoneperiod()':  %lld\n", currenttimemillis());
-  printf("Elapsed time: %lld\n", elapsed);
+  timer_test();
 
   return 0;
 }

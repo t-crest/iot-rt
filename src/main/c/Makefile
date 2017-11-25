@@ -2,6 +2,6 @@ CC=gcc
 # CC=clang
 
 all:
-	rm -f a.out
+	rm a.out
 	$(CC) *.c
 	./a.out
