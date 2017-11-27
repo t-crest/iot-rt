@@ -76,7 +76,11 @@ int waitfornextperiod(){
   return totalwait;
 }
 
-//TODO: a 'timetonextperiod' function
+// if positive, the deadline is broke 
+//   (more than one PERIOD has elapsed since last 'waitfornextperiod() call)
+int deadline(){
+    return (currenttimemillis() - _start) - PERIOD;
+}
 
 //*****************************************************************************
 // UDP SECTION
@@ -113,6 +117,16 @@ int timer_test() {
   printf("Timer after 'waitforoneperiod()':   %10d ms \n", currenttimemillis());
   printf("Elapsed time since prev. wfnp call: %10d ms \n", elapsed2);
 
+  //1 ms left
+  wait(999);
+  printf("Deadline (-1, so hurry up!):        %10d ms \n", deadline());
+  
+  //broke deadline
+  waitfornextperiod();
+  wait(1666);
+  if(deadline())
+    printf("Deadline (+666, bye bye...):        %10d ms \n", deadline());
+         
   // test result ok?
   if (elapsed2 == 123)
     res = 1;
