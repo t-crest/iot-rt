@@ -26,7 +26,7 @@
 // buffers (in 32-bit words)
 static int buf[MAX_BUF_NUM][MAX_BUF_SIZE/4];
 // length of each buffer (in bytes)
-static int buf_bytes[MAX_BUF_NUM];
+static int bufbytes[MAX_BUF_NUM];
 
 //*****************************************************************************
 // FORWARD DECLARATIONS (only on a "need-to" basis)
@@ -36,6 +36,8 @@ static int buf_bytes[MAX_BUF_NUM];
 //*****************************************************************************
 // UTILITIES SECTION
 //*****************************************************************************
+
+// TIMER UTILITIES
 
 // function for getting number of milliseconds since "system-epoc"
 // used with waitfornextperiod
@@ -68,6 +70,7 @@ void initwaitfornextperiod(){
 // returns time since 'initwaitfornextperiod()' was called 
 //   so not including the rest of the PERIOD
 // if return value is greater then PERIOD, it might indicate a deadline problem
+//todo: validate/check with ms scala code
 int waitfornextperiod(){
   int totalwait = currenttimemillis() - _start;
   int waitfor = PERIOD - ((currenttimemillis() - _start) % PERIOD);
@@ -82,13 +85,31 @@ int deadline(){
     return (currenttimemillis() - _start) - PERIOD;
 }
 
+// CHECKSUM UTILITIES
+
+//todo: sum 16-bits as part of an array and pad if uneven
+
 //*****************************************************************************
 // UDP SECTION
 //*****************************************************************************
 
+//todo: create getter/setter functions for fields
+//todo: checksum
+
+
 //*****************************************************************************
 // IP SECTION
 //*****************************************************************************
+
+//todo: create getter/setter functions for fields
+//todo:checksum
+
+//*****************************************************************************
+// ETHERNET SECTION (martin?)
+//*****************************************************************************
+
+//todo (martin?): create a simple set of files for getting started
+
 
 //*****************************************************************************
 // TEST SECTION: Temp. area to keep "ok" test code and misc. snippets
