@@ -28,6 +28,11 @@ static int buf[MAX_BUF_NUM][MAX_BUF_SIZE/4];
 // length of each buffer (in bytes)
 static int bufbytes[MAX_BUF_NUM];
 
+// number of bytes in int
+#define INTBYTES = 4
+
+//sizeof(arr)/sizeof(arr[0]);
+
 //*****************************************************************************
 // FORWARD DECLARATIONS (only on a "need-to" basis)
 //*********************************************************************
@@ -88,6 +93,29 @@ int deadline(){
 // CHECKSUM UTILITIES
 
 //todo: sum 16-bits as part of an array and pad if uneven
+int checksumdata(char data[], int arraysize){
+printf("arraysize=%d\n", arraysize);
+  for(int i = 0; i < arraysize; i = i + 1){    
+  printf("...data[%d]=0x%X\n", i, data[i]);
+}
+ 
+    int datachecksum = 0;
+    if (arraysize == 0) {
+       // nothing to do
+    }
+    else if (arraysize == 1){
+        datachecksum = ((int)data[0] << 8); // Pad with a "zero"
+    }
+    else{
+        for(int i = 0; i < arraysize-1; i = i + 2){ // byte "pairs"
+            datachecksum = datachecksum + (((int) data[i] << 8) | ((int) data[i+1]));
+printf("datachecksum=0x%X\n", datachecksum);
+        }
+        if (arraysize % 2 != 0)  // one byte left
+            datachecksum = datachecksum + ((int) data[arraysize - 1] << 8);
+    }
+    return datachecksum;
+}
 
 //*****************************************************************************
 // UDP SECTION
@@ -156,6 +184,31 @@ int timer_test() {
   return res;
 }
 
+void checksum_test2(char data[]){
+  //data has degraded to a char* so it does not work
+  //printf("***elems in mydata=%d\n",(int)ARRAY_SIZE(data));
+}
+
+int checksum_test(){
+  int res = 0; 
+  
+  char mydata[] = {0x01, 0x02, 0x03, 0x04};
+  printf("elems in mydata=%d\n",sizeof(mydata)/sizeof(mydata[0]));
+  int chksum = checksumdata(mydata, sizeof(mydata)/sizeof(mydata[0]));
+  if (chksum == 0x0406) res = 1; 
+  else res = 0;
+  printf("Checksum: 0x%X\n", chksum);
+  char mydata2[] = {0x01, 0x02, 0x03};
+  int chksum2 = checksumdata(mydata2, sizeof(mydata2)/sizeof(mydata2[0]));
+  if (chksum == 0x0402) res = 1; 
+  else res = 0;
+  printf("Checksum2: 0x%X\n", chksum2);
+  //checksum_test2(mydata);
+  
+  return res;
+  
+}
+
 
 //*****************************************************************************
 // MAIN SECTION: Place various "main" functions here and enable as needed
@@ -164,8 +217,8 @@ int timer_test() {
 // Basic testing
 int main() {
   printf("Hello tpip world! \n\n");
-  
-  timer_test();
+  if(!checksum_test()) printf("checksum_test() failed\n");
+  if(!timer_test()) printf("timer_test() failed\n");
 
   return 0;
 }
