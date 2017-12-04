@@ -92,8 +92,8 @@ int deadline(){
 
 // CHECKSUM UTILITIES
 
-//todo: sum 16-bits as part of an array and pad if uneven
-int checksumdata(char data[], int arraysize){
+// 16-bit (pairs of two byte array entries)
+int datasum(char data[], int arraysize){
 printf("arraysize=%d\n", arraysize);
   for(int i = 0; i < arraysize; i = i + 1){    
   printf("...data[%d]=0x%X\n", i, data[i]);
@@ -116,6 +116,20 @@ printf("datachecksum=0x%X\n", datachecksum);
     }
     return datachecksum;
 }
+
+// adds in the potntial carries and finally inverts
+int checksum(int chksumcarry) {
+  int checksum = chksumcarry;
+  if (checksum & 0xFFFF0000 > 0) 
+      checksum = (checksum > 16) + (checksum & 0x0000FFFF);
+  if (checksum & 0xFFFF0000 > 0)
+      checksum = (checksum > 16) + (checksum & 0x0000FFFF);
+  if (checksum & 0xFFFF0000 > 0)
+      checksum = (checksum > 16) + (checksum & 0x0000FFFF);
+  checksum = ~checksum;
+  return checksum & 0x0000FFFF;
+}
+
 
 //*****************************************************************************
 // UDP SECTION
@@ -194,16 +208,27 @@ int checksum_test(){
   
   char mydata[] = {0x01, 0x02, 0x03, 0x04};
   printf("elems in mydata=%d\n",sizeof(mydata)/sizeof(mydata[0]));
-  int chksum = checksumdata(mydata, sizeof(mydata)/sizeof(mydata[0]));
+  int chksum = datasum(mydata, sizeof(mydata)/sizeof(mydata[0]));
   if (chksum == 0x0406) res = 1; 
   else res = 0;
   printf("Checksum: 0x%X\n", chksum);
   char mydata2[] = {0x01, 0x02, 0x03};
-  int chksum2 = checksumdata(mydata2, sizeof(mydata2)/sizeof(mydata2[0]));
+  int chksum2 = datasum(mydata2, sizeof(mydata2)/sizeof(mydata2[0]));
   if (chksum == 0x0402) res = 1; 
   else res = 0;
   printf("Checksum2: 0x%X\n", chksum2);
   //checksum_test2(mydata);
+  // 0xb861 is the checksum
+  // 4500 0073 0000 4000 4011 *b861* c0a8 0001 c0a8 00c7
+  char mydata3[] = {0x45, 0x00, 0x00, 0x73, 0x00, 0x00, 
+                    0x40, 0x00, 0x40, 0x11,  0xb8, 0x61, 0xc0, 0xa8, 
+                    0x00, 0x01, 0xc0, 0xa8, 0x00, 0xc7};
+  int chksum3 = datasum(mydata3, sizeof(mydata3)/sizeof(mydata3[0]));
+printf("...chksum3=0x%X\n", chksum3);
+  chksum3 = checksum(chksum3);
+  if (chksum3 == 0x0000) res = 1; 
+  else res = 0;
+  printf("Checksum3: 0x%X\n", chksum3);
   
   return res;
   
