@@ -6,6 +6,10 @@
   License: Simplified BSD
 */
 
+//patmos-clang -O2 -mserialize=checksumwcet.pml checksumwcet.c
+//platin wcet -i checksumwcet.pml -b a.out -e checksum --report
+// checksum is the analysis entry point that would be inlined with -O2
+
 #include <stdio.h>
 #include <sys/time.h>
 
@@ -31,6 +35,9 @@ static int bufbytes[MAX_BUF_NUM];
 // number of bytes in int
 #define INTBYTES = 4
 
+// _Pragma( "loopbound min 0 max 256" )
+#define WCALOOP _Pragma("loopbound min 0 max 256")
+
 //sizeof(arr)/sizeof(arr[0]);
 
 //*****************************************************************************
@@ -46,6 +53,7 @@ static int bufbytes[MAX_BUF_NUM];
 
 // function for getting number of milliseconds since "system-epoc"
 // used with waitfornextperiod
+int currenttimemillis() __attribute__((noinline));
 int currenttimemillis(){
   struct timeval timenow; 
   gettimeofday(&timenow, NULL);    
@@ -60,8 +68,10 @@ int currenttimemillis(){
 //spins for a number of ms
 //used by waitfornextperiod
 //note: similar to 'clock()' in time.h
+void wait(int waittime) __attribute__((noinline));
 void wait(int waittime){
   int now = currenttimemillis();
+  _Pragma( "loopbound min 0 max 256" )
   while(currenttimemillis()-now < waittime);
 }
 
@@ -118,13 +128,14 @@ printf("datachecksum=0x%X\n", datachecksum);
 }
 
 // adds in the potntial carries and finally inverts
+int checksum(int chksumcarry) __attribute__((noinline));
 int checksum(int chksumcarry) {
   int checksum = chksumcarry;
-  if (checksum & 0xFFFF0000 > 0) 
+  if ((checksum & 0xFFFF0000) > 0) 
       checksum = (checksum > 16) + (checksum & 0x0000FFFF);
-  if (checksum & 0xFFFF0000 > 0)
+  if ((checksum & 0xFFFF0000) > 0)
       checksum = (checksum > 16) + (checksum & 0x0000FFFF);
-  if (checksum & 0xFFFF0000 > 0)
+  if ((checksum & 0xFFFF0000) > 0)
       checksum = (checksum > 16) + (checksum & 0x0000FFFF);
   checksum = ~checksum;
   return checksum & 0x0000FFFF;
@@ -207,7 +218,7 @@ int checksum_test(){
   int res = 0; 
   
   char mydata[] = {0x01, 0x02, 0x03, 0x04};
-  printf("elems in mydata=%d\n",sizeof(mydata)/sizeof(mydata[0]));
+  printf("elems in mydata=%lu\n",sizeof(mydata)/sizeof(mydata[0]));
   int chksum = datasum(mydata, sizeof(mydata)/sizeof(mydata[0]));
   if (chksum == 0x0406) res = 1; 
   else res = 0;
