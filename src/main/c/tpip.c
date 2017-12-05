@@ -36,7 +36,7 @@ static int bufbytes[MAX_BUF_NUM];
 #define INTBYTES = 4
 
 // _Pragma( "loopbound min 0 max 256" )
-#define WCALOOP _Pragma("loopbound min 0 max 256")
+//#define WCALOOP _Pragma("loopbound min 0 max 256")
 
 //sizeof(arr)/sizeof(arr[0]);
 
@@ -48,6 +48,9 @@ static int bufbytes[MAX_BUF_NUM];
 //*****************************************************************************
 // UTILITIES SECTION
 //*****************************************************************************
+
+// GENERAL 
+
 
 // TIMER UTILITIES
 
@@ -73,6 +76,12 @@ void wait(int waittime){
   int now = currenttimemillis();
   _Pragma( "loopbound min 0 max 256" )
   while(currenttimemillis()-now < waittime);
+}
+
+void modularx() __attribute__((noinline));
+void modularx(){
+  //int result = a - ((b * a)/b);
+  int i = 1 + 1;//return 1;//result;
 }
 
 // init waitfornextperiod 
@@ -255,6 +264,8 @@ int main() {
   printf("Hello tpip world! \n\n");
   if(!checksum_test()) printf("checksum_test() failed\n");
   if(!timer_test()) printf("timer_test() failed\n");
+  
+  //modular(3, 2);
 
   return 0;
 }
