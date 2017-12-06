@@ -50,7 +50,6 @@ static int* header = buf[0];
 
 // GENERAL
 
-
 // TIMER UTILITIES
 
 // function for getting number of milliseconds since "system-epoc"
@@ -105,7 +104,7 @@ int waitfornextperiod(){
 // if positive, the deadline is broke
 //   (more than one PERIOD has elapsed since last 'waitfornextperiod() call)
 int deadline(){
-    return (currenttimemillis() - _start) - PERIOD;
+  return (currenttimemillis() - _start) - PERIOD;
 }
 
 // CHECKSUM UTILITIES
@@ -117,22 +116,23 @@ int datasum(char data[], int arraysize){
     //printf("...data[%d]=0x%X\n", i, data[i]);
   }
 
-    int datachecksum = 0;
-    if (arraysize == 0) {
-       // nothing to do
+  int datachecksum = 0;
+  if (arraysize == 0) {
+    // nothing to do
+  }
+  else if (arraysize == 1){
+    datachecksum = ((int)data[0] << 8); // Pad with a "zero"
+  }
+  else{
+    for(int i = 0; i < arraysize-1; i = i + 2){ // byte "pairs"
+      datachecksum = datachecksum + (((int) data[i] << 8) | ((int) data[i+1]));
+      //printf("datachecksum=0x%X\n", datachecksum);
     }
-    else if (arraysize == 1){
-        datachecksum = ((int)data[0] << 8); // Pad with a "zero"
-    }
-    else{
-        for(int i = 0; i < arraysize-1; i = i + 2){ // byte "pairs"
-            datachecksum = datachecksum + (((int) data[i] << 8) | ((int) data[i+1]));
-            //printf("datachecksum=0x%X\n", datachecksum);
-        }
-        if (arraysize % 2 != 0)  // one byte left
-            datachecksum = datachecksum + ((int) data[arraysize - 1] << 8);
-    }
-    return datachecksum;
+    if (arraysize % 2 != 0)  // one byte left
+      datachecksum = datachecksum + ((int) data[arraysize - 1] << 8);
+  }
+
+  return datachecksum;
 }
 
 // adds in the potntial carries and finally inverts
@@ -140,114 +140,186 @@ int checksum(int chksumcarry) __attribute__((noinline));
 int checksum(int chksumcarry) {
   int checksum = chksumcarry;
   if ((checksum & 0xFFFF0000) > 0)
-      checksum = (checksum > 16) + (checksum & 0x0000FFFF);
+    checksum = (checksum > 16) + (checksum & 0x0000FFFF);
   if ((checksum & 0xFFFF0000) > 0)
-      checksum = (checksum > 16) + (checksum & 0x0000FFFF);
+    checksum = (checksum > 16) + (checksum & 0x0000FFFF);
   if ((checksum & 0xFFFF0000) > 0)
-      checksum = (checksum > 16) + (checksum & 0x0000FFFF);
+    checksum = (checksum > 16) + (checksum & 0x0000FFFF);
   checksum = ~checksum;
   return checksum & 0x0000FFFF;
 }
 
-
 //*****************************************************************************
 // UDP SECTION
 //*****************************************************************************
-
+//RFC 768
+//User Datagram Header Format
+//  0      7 8     15 16    23 24    31
+//  +--------+--------+--------+--------+
+//  |     Source      |   Destination   |
+//  |      Port       |      Port       |
+//  +--------+--------+--------+--------+
+//  |                 |                 |
+//  |     Length      |    Checksum     |
+//  +--------+--------+--------+--------+
+//  |
+//  |          data octets ...
+//  +---------------- ...
+//
+//Pseudo-header prepended UDP header for checksum purposes
+//  0      7 8     15 16    23 24    31
+//  +--------+--------+--------+--------+
+//  |          source address           |
+//  +--------+--------+--------+--------+
+//  |        destination address        |
+//  +--------+--------+--------+--------+
+//  |  zero  |protocol|   UDP length    |
+//  +--------+--------+--------+--------+
 //todo: create getter/setter functions for fields
 //todo: checksum
 
-//todo: header_mask and ver_mask
+// UDP source port
+int getudpsrcport() {
+  return (header[0] << 8) | (header[1]);
+}
 
+void setudpsrcport(int value){
+  header[0] = (char) (value >> 8);
+  header[1] = (char) value;
+}
+
+// UDP destination port
+int getudpdstport() {
+  return (header[2] << 8) | (header[3]);
+}
+
+void setudpdstport(int value){
+  header[2] = (char) (value >> 8); 
+  header[3] = (char) value;
+}
+
+// UDP length
+int getudplen(){
+  return (header[4] << 8) | header[5];
+}                     
+
+void setudplen(int value){
+  header[4] = (char) (value >> 8);
+  header[5] = (char) value;
+} 
+
+int getudpchksum(){
+   return (header[6] << 8) | header[7];
+}     
+
+void setudpchksum(int value){
+  header[6] = (char) (value >> 8);
+  header[7] = (char) value;
+} 
 
 //*****************************************************************************
 // IP SECTION
 //*****************************************************************************
-
+// RFC 791:  Internet Header Format
+//  0                   1                   2                   3
+//  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |Version|  IHL  |Type of Service|          Total Length         |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |         Identification        |Flags|      Fragment Offset    |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |  Time to Live |    Protocol   |         Header Checksum       |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |                       Source Address                          |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |                    Destination Address                        |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |                    Options                    |    Padding    |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ 
 //todo: create getter/setter functions for fields
 //todo:checksum
 //member __.Header with get()      = header and
 //                      set(value) = header <- value
 
-/// Version 4-bits .[V0]
-int getver(){
+// Version 4-bits .[V0]
+int getipver(){
   return header[0] >> 4;
 }
 
-void setver(int value){
+void setipver(int value){
   header[0] = (char) ((value << 4) | (header[0] & HDR_MASK));
 }
 
-/// Header 4-bits .[0H], number of 32-bit words
-int gethdr(){
+// Header 4-bits .[0H], number of 32-bit words
+int getiphdr(){
   return header[0] & HDR_MASK;
 }
 
-void sethdr(int value){
-    header[0] = (char) (header[0] & VER_MASK) | (value & HDR_MASK);
+void setiphdr(int value){
+  header[0] = (char) (header[0] & VER_MASK) | (value & HDR_MASK);
 }
 
-  /// Type of service 8-bits .[1]
-int gettos(){
+// Type of service 8-bits .[1]
+int getiptos(){
   return header[1];
 }
 
-void settos(int value){
+void setiptos(int value){
   header[1] = (char) value;
 }
 
-/// Total length in byte, 16-bits .[2] .[3]
-int gettlen(){
+// Total length in byte, 16-bits .[2] .[3]
+int getiptlen(){
   return (header[2] << 8) | header[3];
 }
 
-void settlen(int value){
+void setiptlen(int value){
   header[2] = (char) (value >> 8);
   header[3] = (char) value;
 }
 
-/// Identification, 16-bits, .[4] .[5]
-int getid(){
+// Identification, 16-bits, .[4] .[5]
+int getipid(){
   return (header[4] << 8) | header[5];
 }
 
-void setid(int value){
-// check >>> or >>
+void setipid(int value){
+  // check >>> or >>
   header[4] = (char) value >> 8;
   header[5] = (char) value;
 }
 
-/// Flags, 3-bits, .[6H]
+// Flags, 3-bits, .[6H]
 int getflags(){
   return header[6] >> 5;
 }
 
-void setflags(int value){
+void setipflags(int value){
   header[6] = (char) ((value & FLAGS_MASK) << 5) | (header[6] & 0x1F); //0001_1111
 }
 
-/// Fragment offset, 13-bits, .[6L] .[7]
-
-int getfoff(){
+// Fragment offset, 13-bits, .[6L] .[7]
+int getipfoff(){
   return ((header[6] & 0x1F) << 8) | header[7]; //0001_1111
 }
 
-void setfoff(int value){
+void setipfoff(int value){
   header[6] = (char) (header[6] & 0xE0) | (value >> 8);
   header[7] = (char) value;
 }
 
-/// Time to live, 8-bits, .[8]
-int getttl() {
+// Time to live, 8-bits, .[8]
+int getipttl() {
   return header[8];
 }
 
-void setttl(int value){
+void setipttl(int value){
   header[8] = (char) value;
 }
 
-/// Protocol, 8-bits, .[9]
-int getprot() {
+// Protocol, 8-bits, .[9]
+int getipprot() {
   return header[9];
 } 
                       
@@ -255,36 +327,36 @@ void setprot(int value){
   header[9] = (char) value;
 }
 
-/// Checksum, 16-bits, .[10] .[11]
-int gethchksum() {
+// Checksum, 16-bits, .[10] .[11]
+int getiphchksum() {
   return (header[10] << 8) | header[11];
 }
 
-void sethchksum(int value){
+void setiphchksum(int value){
   header[10] = (char) (value >> 8);
   header[11] = (char) value;
 }
 
-/// Source IP, 32-bits, .[12] .[13] .[14] .[15]
-int getsrcip () {
-    return (header[12] << 24) | (header[13] << 16) |
-           (header[14] <<  8) | (header[15]);
+// Source IP, 32-bits, .[12] .[13] .[14] .[15]
+int getipsrcip () {
+  return (header[12] << 24) | (header[13] << 16) |
+          (header[14] <<  8) | (header[15]);
 }                    
 
-void setsrcip(int value){
+void setipsrcip(int value){
   header[12] = (char) (value >> 24); // check the shift
   header[13] = (char) (value >> 16);
   header[14] = (char) (value >> 8);
   header[15] = (char) value;
 } 
 
-/// Destination IP, 32-bits, .[16] .[17] .[18] .[19]
-int getdstip(){
+// Destination IP, 32-bits, .[16] .[17] .[18] .[19]
+int getipdstip(){
   return (header[16] << 24) | (header[17] << 16) |
          (header[18] <<  8) | header[19];  
 }                    
 
-void setdstip(int value) {
+void setipdstip(int value) {
   header[16] = (char) (value >> 24);
   header[17] = (char) (value >> 16);
   header[18] = (char) (value >> 8);
@@ -315,7 +387,6 @@ int timer_test() {
   int show = 0;
   if(show) printf("timer_test!\n");
   if(show) printf("PERIOD: %d ms \n\n", PERIOD);
-
   //start timer
   initwaitfornextperiod();
   int before = currenttimemillis();
@@ -325,7 +396,6 @@ int timer_test() {
   if(show) printf("Timer after 'waitforoneperiod()':   %10d ms \n", after);
   if(show) printf("Elapsed time since prev. wfnp call: %10d ms \n", elapsed1);
   if(show) printf("Elapsed time since this wfnp call:  %10d ms \n\n", (after-before));
-
   // uncomment 'for'  loop to get a false test
   //for(volatile int i = 0; i < 100000000; i++); // 'volatile' to avoid '-O2' optimization
   wait(123); // 'wait(321)' will give a false test
@@ -333,17 +403,14 @@ int timer_test() {
   int elapsed2 = waitfornextperiod();
   if(show) printf("Timer after 'waitforoneperiod()':   %10d ms \n", currenttimemillis());
   if(show) printf("Elapsed time since prev. wfnp call: %10d ms \n", elapsed2);
-
   //1 ms left
   wait(999);
   if(show) printf("Deadline (-1, so hurry up!):        %10d ms \n", deadline());
-
   //broke deadline
   waitfornextperiod();
   wait(1666);
   if(deadline())
     if(show) printf("Deadline (+666, bye bye...):        %10d ms \n", deadline());
-
   // test result ok?
   if (elapsed2 == 123)
     res = 1;
@@ -383,11 +450,8 @@ int mod_test(){
   int res = 0; //false
   if (mod(10,3) == 1)
     res = 1;
-
   return res;
 }
-
-
 
 //*****************************************************************************
 // MAIN SECTION: Place various "main" functions here and enable as needed
@@ -396,12 +460,10 @@ int mod_test(){
 // Basic testing
 int main() {
   printf("Hello tpip world! \n\n");
-
   // some tests
   if(!checksum_test()) printf("checksum_test() failed\n");
   if(!timer_test()) printf("timer_test() failed\n");
   if(!mod_test()) printf("mod_test() failed\n");
-
   return 0;
 }
 
@@ -433,44 +495,3 @@ int main() {
 //   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 //   |     Data ...
 //   +-+-+-+-+-
-
-//RFC 768
-//User Datagram Header Format
-//  0      7 8     15 16    23 24    31
-//  +--------+--------+--------+--------+
-//  |     Source      |   Destination   |
-//  |      Port       |      Port       |
-//  +--------+--------+--------+--------+
-//  |                 |                 |
-//  |     Length      |    Checksum     |
-//  +--------+--------+--------+--------+
-//  |
-//  |          data octets ...
-//  +---------------- ...
-//
-//Pseudo-header prepended UDP header for checksum purposes
-//  0      7 8     15 16    23 24    31
-//  +--------+--------+--------+--------+
-//  |          source address           |
-//  +--------+--------+--------+--------+
-//  |        destination address        |
-//  +--------+--------+--------+--------+
-//  |  zero  |protocol|   UDP length    |
-//  +--------+--------+--------+--------+
-
-// RFC 791:  Internet Header Format
-//  0                   1                   2                   3
-//  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |Version|  IHL  |Type of Service|          Total Length         |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |         Identification        |Flags|      Fragment Offset    |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |  Time to Live |    Protocol   |         Header Checksum       |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       Source Address                          |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                    Destination Address                        |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                    Options                    |    Padding    |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
