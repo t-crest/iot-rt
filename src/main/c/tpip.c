@@ -6,12 +6,27 @@
   License: Simplified BSD
 */
 
-//patmos-clang -O2 -mserialize=checksumwcet.pml checksumwcet.c
-//platin wcet -i checksumwcet.pml -b a.out -e checksum --report
+// patmos-clang -O2 -mserialize=checksumwcet.pml checksumwcet.c
+// platin wcet -i checksumwcet.pml -b a.out -e checksum --report
 // checksum is the analysis entry point that would be inlined with -O2
 
 #include <stdio.h>
 #include <sys/time.h>
+
+//*****************************************************************************
+// FORWARD DECLARATIONS (only on a "need-to" basis)
+//*********************************************************************
+
+//typedef struct udpstruct_t udpstruct_t;
+typedef struct ipstruct_t ipstruct_t;
+typedef struct udpstruct_t {
+   ipstruct_t* ipstructp;
+   char* header;
+} udpstruct_t;
+
+typedef struct ipstruct_t {
+   char* header;
+} ipstruct_t;
 
 //*****************************************************************************
 // CONSTANT PARAMETERS SECTION
@@ -27,22 +42,23 @@
 // very important WCET parameter
 #define MAX_BUF_SIZE 1024
 // fixed, static buffers to enable WCET analysis
-// buffers (in 32-bit words)
-static int buf[MAX_BUF_NUM][MAX_BUF_SIZE/4];
+static char buf[MAX_BUF_NUM][MAX_BUF_SIZE];///4];
 // length of each buffer (in bytes)
-static int bufbytes[MAX_BUF_NUM];
+static char bufbytes[MAX_BUF_NUM];
 
-// IP PROTOCOL CONSTANTS //
+// UDP PROTOCOL //
+static udpstruct_t udp[MAX_BUF_NUM];
+
+// IP PROTOCOL //
 #define VER_MASK 0xF0  //111_0000
 #define HDR_MASK 0x0F  //0000_1111
 #define FLAGS_MASK 0x7 //0111
+static ipstruct_t ip[MAX_BUF_NUM];
 
-//*****************************************************************************
-// FORWARD DECLARATIONS (only on a "need-to" basis)
-//*********************************************************************
 
 // temp
-static int* header = buf[0];
+// to be changed when we also have an ethernet header
+static char* header = (char*) buf[0]; //// todo: check this cast
 
 //*****************************************************************************
 // UTILITIES SECTION
@@ -115,7 +131,6 @@ int datasum(char data[], int arraysize){
   for(int i = 0; i < arraysize; i = i + 1){
     //printf("...data[%d]=0x%X\n", i, data[i]);
   }
-
   int datachecksum = 0;
   if (arraysize == 0) {
     // nothing to do
@@ -136,8 +151,8 @@ int datasum(char data[], int arraysize){
 }
 
 // adds in the potntial carries and finally inverts
-int checksum(int chksumcarry) __attribute__((noinline));
-int checksum(int chksumcarry) {
+int calculateipchecksum(int chksumcarry) __attribute__((noinline));
+int calculateipchecksum(int chksumcarry) {
   int checksum = chksumcarry;
   if ((checksum & 0xFFFF0000) > 0)
     checksum = (checksum > 16) + (checksum & 0x0000FFFF);
@@ -175,8 +190,8 @@ int checksum(int chksumcarry) {
 //  +--------+--------+--------+--------+
 //  |  zero  |protocol|   UDP length    |
 //  +--------+--------+--------+--------+
-//todo: create getter/setter functions for fields
-//todo: checksum
+
+
 
 // UDP source port
 int getudpsrcport() {
@@ -236,132 +251,167 @@ void setudpchksum(int value){
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 // |                    Options                    |    Padding    |
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- 
-//todo: create getter/setter functions for fields
-//todo:checksum
+
+
+
 //member __.Header with get()      = header and
 //                      set(value) = header <- value
 
 // Version 4-bits .[V0]
-int getipver(){
-  return header[0] >> 4;
+int getipver(ipstruct_t* ip_p){
+  return ip_p->header[0] >> 4;
 }
 
-void setipver(int value){
-  header[0] = (char) ((value << 4) | (header[0] & HDR_MASK));
+void setipver(ipstruct_t* ip_p, int value){
+  ip_p->header[0] = (char) ((value << 4) | (ip_p->header[0] & HDR_MASK));
 }
 
 // Header 4-bits .[0H], number of 32-bit words
-int getiphdr(){
-  return header[0] & HDR_MASK;
+int getiphdr(ipstruct_t* ip_p){
+  return ip_p->header[0] & HDR_MASK;
 }
 
-void setiphdr(int value){
-  header[0] = (char) (header[0] & VER_MASK) | (value & HDR_MASK);
+void setiphdr(ipstruct_t* ip_p, int value){
+  ip_p->header[0] = (char) (ip_p->header[0] & VER_MASK) | (value & HDR_MASK);
 }
 
 // Type of service 8-bits .[1]
-int getiptos(){
-  return header[1];
+int getiptos(ipstruct_t* ip_p){
+  return ip_p->header[1];
 }
 
-void setiptos(int value){
-  header[1] = (char) value;
+void setiptos(ipstruct_t* ip_p, int value){
+  ip_p->header[1] = (char) value;
 }
 
 // Total length in byte, 16-bits .[2] .[3]
-int getiptlen(){
-  return (header[2] << 8) | header[3];
+int getiptlen(ipstruct_t* ip_p){
+  return (ip_p->header[2] << 8) | ip_p->header[3];
 }
 
-void setiptlen(int value){
-  header[2] = (char) (value >> 8);
-  header[3] = (char) value;
+void setiptlen(ipstruct_t* ip_p, int value){
+  ip_p->header[2] = (char) (value >> 8);
+  ip_p->header[3] = (char) value;
 }
 
 // Identification, 16-bits, .[4] .[5]
-int getipid(){
-  return (header[4] << 8) | header[5];
+int getipid(ipstruct_t* ip_p){
+  return (ip_p->header[4] << 8) | ip_p->header[5];
 }
 
-void setipid(int value){
+void setipid(ipstruct_t* ip_p, int value){
   // check >>> or >>
-  header[4] = (char) value >> 8;
-  header[5] = (char) value;
+  ip_p->header[4] = (char) value >> 8;
+  ip_p->header[5] = (char) value;
 }
 
 // Flags, 3-bits, .[6H]
-int getflags(){
-  return header[6] >> 5;
+int getflags(ipstruct_t* ip_p){
+  return ip_p->header[6] >> 5;
 }
 
-void setipflags(int value){
-  header[6] = (char) ((value & FLAGS_MASK) << 5) | (header[6] & 0x1F); //0001_1111
+void setipflags(ipstruct_t* ip_p, int value){
+  ip_p->header[6] = (char) ((value & FLAGS_MASK) << 5) | (ip_p->header[6] & 0x1F); //0001_1111
 }
 
 // Fragment offset, 13-bits, .[6L] .[7]
-int getipfoff(){
-  return ((header[6] & 0x1F) << 8) | header[7]; //0001_1111
+int getipfoff(ipstruct_t* ip_p){
+  return ((ip_p->header[6] & 0x1F) << 8) | ip_p->header[7]; //0001_1111
 }
 
-void setipfoff(int value){
-  header[6] = (char) (header[6] & 0xE0) | (value >> 8);
+void setipfoff(ipstruct_t* ip_p, int value){
+  header[6] = (char) (ip_p->header[6] & 0xE0) | (value >> 8);
   header[7] = (char) value;
 }
 
 // Time to live, 8-bits, .[8]
-int getipttl() {
-  return header[8];
+int getipttl(ipstruct_t* ip_p) {
+  return ip_p->header[8];
 }
 
-void setipttl(int value){
-  header[8] = (char) value;
+void setipttl(ipstruct_t* ip_p, int value){
+  ip_p->header[8] = (char) value;
 }
 
 // Protocol, 8-bits, .[9]
-int getipprot() {
-  return header[9];
+int getipprot(ipstruct_t* ip_p) {
+  return ip_p->header[9];
 } 
                       
-void setprot(int value){
-  header[9] = (char) value;
+void setipprot(ipstruct_t* ip_p, int value){
+  ip_p->header[9] = (char) value;
 }
 
 // Checksum, 16-bits, .[10] .[11]
-int getiphchksum() {
-  return (header[10] << 8) | header[11];
+int getiphchksum(ipstruct_t* ip_p) {
+  return (ip_p->header[10] << 8) | ip_p->header[11];
 }
 
-void setiphchksum(int value){
-  header[10] = (char) (value >> 8);
-  header[11] = (char) value;
+void setiphchksum(ipstruct_t* ip_p, int value){
+  ip_p->header[10] = (char) (value >> 8);
+  ip_p->header[11] = (char) value;
 }
 
 // Source IP, 32-bits, .[12] .[13] .[14] .[15]
-int getipsrcip () {
-  return (header[12] << 24) | (header[13] << 16) |
-          (header[14] <<  8) | (header[15]);
+int getipsrcip (ipstruct_t* ip_p) {
+  return (ip_p->header[12] << 24) | (ip_p->header[13] << 16) |
+          (ip_p->header[14] <<  8) | (ip_p->header[15]);
 }                    
 
-void setipsrcip(int value){
-  header[12] = (char) (value >> 24); // check the shift
-  header[13] = (char) (value >> 16);
-  header[14] = (char) (value >> 8);
-  header[15] = (char) value;
+void setipsrcip(ipstruct_t* ip_p, int value){
+  ip_p->header[12] = (char) (value >> 24); // check the shift
+  ip_p->header[13] = (char) (value >> 16);
+  ip_p->header[14] = (char) (value >> 8);
+  ip_p->header[15] = (char) value;
 } 
 
 // Destination IP, 32-bits, .[16] .[17] .[18] .[19]
-int getipdstip(){
-  return (header[16] << 24) | (header[17] << 16) |
-         (header[18] <<  8) | header[19];  
+int getipdstip(ipstruct_t* ip_p){
+  return (ip_p->header[16] << 24) | (ip_p->header[17] << 16) |
+         (ip_p->header[18] <<  8) | ip_p->header[19];  
 }                    
 
-void setipdstip(int value) {
-  header[16] = (char) (value >> 24);
-  header[17] = (char) (value >> 16);
-  header[18] = (char) (value >> 8);
-  header[19] = (char) value;
+void setipdstip(ipstruct_t* ip_p, int value) {
+  ip_p->header[16] = (char) (value >> 24);
+  ip_p->header[17] = (char) (value >> 16);
+  ip_p->header[18] = (char) (value >> 8);
+  ip_p->header[19] = (char) value;
 }
+
+// ip functions //
+
+// init ip packet fields
+void initip(ipstruct_t* ip_p,
+                   int ver,
+                   int hdrwrds,
+                   int tos, 
+                   int id, 
+                   int flags, 
+                   int foff, 
+                   int ttl, 
+                   int prot, 
+                   int srcip, 
+                   int dstip, 
+                   //int* data,
+                   int tlen,
+                   int hchksum) // to be calculated:0xFFFF
+{
+  setipver(ip_p, ver);
+  setiphdr(ip_p, hdrwrds);
+  setiptos(ip_p, tos);
+  setipid(ip_p, id);
+  setipflags(ip_p, flags);
+  setipfoff(ip_p, foff);
+  setipttl(ip_p, ttl);
+  setipprot(ip_p, prot);
+  setipsrcip(ip_p, srcip);
+  setipdstip(ip_p, dstip);
+  setiptlen(ip_p, tlen);
+  //if(hchksum == 0xFFFF)
+   // setiphchksum(ip_p, calculateipchecksum(ip_p));
+}
+
+
 
 /// Data, byte array, such an an ICMP message
 /// Manually update TLen and Hchksum
@@ -380,6 +430,8 @@ void setipdstip(int value) {
 //*****************************************************************************
 // TEST SECTION: Temp. area to keep "ok" test code and misc. snippets
 //*****************************************************************************
+
+// TIMER TESTS //
 
 int timer_test() {
   int res = 0;
@@ -418,6 +470,8 @@ int timer_test() {
   return res;
 }
 
+// CHECKSUM TESTS //
+
 int checksum_test(){
   int res = 0;
   char mydata[] = {0x01, 0x02, 0x03, 0x04};
@@ -439,7 +493,7 @@ int checksum_test(){
                     0x00, 0x01, 0xc0, 0xa8, 0x00, 0xc7};
   int chksum3 = datasum(mydata3, sizeof(mydata3)/sizeof(mydata3[0]));
   //printf("...chksum3=0x%X\n", chksum3);
-  chksum3 = checksum(chksum3);
+  chksum3 = calculateipchecksum(chksum3);
   if (chksum3 == 0x0000) res = 1;
   else res = 0;
   //printf("Checksum3: 0x%X\n", chksum3);
@@ -447,10 +501,59 @@ int checksum_test(){
 }
 
 int mod_test(){
-  int res = 0; //false
-  if (mod(10,3) == 1)
-    res = 1;
+  int res = 1; //test ok
+  if (mod(10,3) != 1)
+    res = 0; // test fail
   return res;
+}
+
+// IP TESTS //
+
+int test_initip(){
+  printf("start of test_initip\n");
+  ip[0].header = buf[0];
+  initip(&ip[0],
+         4,          // ver
+         5,          // hdrwrds
+         0,          // tos 
+         0,          // id 
+         0,          // flags
+         0,          // foff
+         10,         // ttl
+         1,          // prot 
+         0x01020304, // srcip
+         0x01020305, // dstip
+                     //int* data,
+         20,         // tlen, todo:not corrrect
+         0xFFFF);    // int hchksum  (0xFFFF will leave it alone)
+
+  if(!(getiptlen(&ip[0]) == 20))
+    printf("Error: getiptlen(ip[0])==%d\n", getiptlen(&ip[0]));
+  else
+    printf("Ok: getiptlen(ip[0])==%d\n", getiptlen(&ip[0]));
+}
+          
+
+// final tests //
+
+// insert new unittests here
+int dotest(){
+  int show = 0; // set to 1 if intermediate results are desired
+  int res = 1; //test ok
+  // some tests
+  if(!checksum_test()) {
+    if(show) printf("checksum_test() failed\n");
+    res = 0; // test fail
+  }
+  if(!timer_test()) {
+    if(show) printf("timer_test() failed\n");
+    res = 0; // test fail
+  }
+  if(!mod_test()) {
+    if(show) printf("mod_test() failed\n");
+    res = 0; // test fail
+  }
+  return res; 
 }
 
 //*****************************************************************************
@@ -460,10 +563,11 @@ int mod_test(){
 // Basic testing
 int main() {
   printf("Hello tpip world! \n\n");
-  // some tests
-  if(!checksum_test()) printf("checksum_test() failed\n");
-  if(!timer_test()) printf("timer_test() failed\n");
-  if(!mod_test()) printf("mod_test() failed\n");
+  if(!dotest())
+    printf("testing: one or more uit tests failed\n\n");
+
+  test_initip();
+
   return 0;
 }
 
