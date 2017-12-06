@@ -21,11 +21,13 @@
 typedef struct ipstruct_t ipstruct_t;
 typedef struct udpstruct_t {
    ipstruct_t* ipstructp;
-   char* header;
+   char* header; // also the ip "data" 
+   char* data;   // this is the udp data
 } udpstruct_t;
 
 typedef struct ipstruct_t {
    char* header;
+   char* data; // this is the udp header
 } ipstruct_t;
 
 //*****************************************************************************
@@ -58,7 +60,7 @@ static ipstruct_t ip[MAX_BUF_NUM];
 
 // temp
 // to be changed when we also have an ethernet header
-static char* header = (char*) buf[0]; //// todo: check this cast
+//static char* header = (char*) buf[0]; //// todo: check this cast
 
 //*****************************************************************************
 // UTILITIES SECTION
@@ -191,46 +193,76 @@ int calculateipchecksum(int chksumcarry) {
 //  |  zero  |protocol|   UDP length    |
 //  +--------+--------+--------+--------+
 
-
-
 // UDP source port
-int getudpsrcport() {
-  return (header[0] << 8) | (header[1]);
+int getudpsrcport(udpstruct_t* udp_p) {
+  return (udp_p->header[0] << 8) | (udp_p->header[1]);
 }
 
-void setudpsrcport(int value){
-  header[0] = (char) (value >> 8);
-  header[1] = (char) value;
+void setudpsrcport(udpstruct_t* udp_p, int value){
+  udp_p->header[0] = (char) (value >> 8);
+  udp_p->header[1] = (char) value;
 }
 
 // UDP destination port
-int getudpdstport() {
-  return (header[2] << 8) | (header[3]);
+int getudpdstport(udpstruct_t* udp_p) {
+  return (udp_p->header[2] << 8) | (udp_p->header[3]);
 }
 
-void setudpdstport(int value){
-  header[2] = (char) (value >> 8); 
-  header[3] = (char) value;
+void setudpdstport(udpstruct_t* udp_p, int value){
+  udp_p->header[2] = (char) (value >> 8); 
+  udp_p->header[3] = (char) value;
 }
 
 // UDP length
-int getudplen(){
-  return (header[4] << 8) | header[5];
+int getudplen(udpstruct_t* udp_p){
+  return (udp_p->header[4] << 8) | udp_p->header[5];
 }                     
 
-void setudplen(int value){
-  header[4] = (char) (value >> 8);
-  header[5] = (char) value;
+void setudplen(udpstruct_t* udp_p, int value){
+  udp_p->header[4] = (char) (value >> 8);
+  udp_p->header[5] = (char) value;
 } 
 
-int getudpchksum(){
-   return (header[6] << 8) | header[7];
+int getudpchksum(udpstruct_t* udp_p){
+   return (udp_p->header[6] << 8) | udp_p->header[7];
 }     
 
-void setudpchksum(int value){
-  header[6] = (char) (value >> 8);
-  header[7] = (char) value;
+void setudpchksum(udpstruct_t* udp_p, int value){
+  udp_p->header[6] = (char) (value >> 8);
+  udp_p->header[7] = (char) value;
 } 
+
+// udp data
+char* getudpdata(udpstruct_t* udp_p){
+  return udp_p->data;
+}
+
+void setudpdata(udpstruct_t* udp_p, char* data, int datacount){
+  udp_p->data = udp_p->header + 8 * (sizeof(char)); //udp header is 8 bytes
+  //todo _Pragma
+  for(int i=0; i < datacount; i++){
+    udp_p->data[i] = data[i];
+  }
+}
+
+// udp functions //
+
+// init udp header fields
+void initudp(udpstruct_t* udp_p,
+                   int srcport,
+                   int dstport,
+                   int len, 
+                   int chksum, // to be calculated, call with 0xFFFF
+                   char* data,
+                   int datacount
+                   ) 
+{
+  setudpsrcport(udp_p, srcport);
+  setudpdstport(udp_p, dstport);
+  setudpdata(udp_p, data, datacount);
+  setudplen(udp_p, len);
+  //if(chksum == 0xFFFF) setudpchksum(udp_p, calculateudpchecksum(udp_p));
+}
 
 //*****************************************************************************
 // IP SECTION
@@ -251,8 +283,6 @@ void setudpchksum(int value){
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 // |                    Options                    |    Padding    |
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-
-
 
 //member __.Header with get()      = header and
 //                      set(value) = header <- value
@@ -320,8 +350,8 @@ int getipfoff(ipstruct_t* ip_p){
 }
 
 void setipfoff(ipstruct_t* ip_p, int value){
-  header[6] = (char) (ip_p->header[6] & 0xE0) | (value >> 8);
-  header[7] = (char) value;
+  ip_p->header[6] = (char) (ip_p->header[6] & 0xE0) | (value >> 8);
+  ip_p->header[7] = (char) value;
 }
 
 // Time to live, 8-bits, .[8]
@@ -378,6 +408,15 @@ void setipdstip(ipstruct_t* ip_p, int value) {
   ip_p->header[19] = (char) value;
 }
 
+// payload data (such as ICMP, UDP, or TCP message)
+char* getipdata(ipstruct_t* ip_p){
+  return ip_p->data;
+}
+
+void setipdata(ipstruct_t* ip_p, char* data){
+  ip_p->data = data;
+}
+
 // ip functions //
 
 // init ip packet fields
@@ -406,15 +445,13 @@ void initip(ipstruct_t* ip_p,
   setipprot(ip_p, prot);
   setipsrcip(ip_p, srcip);
   setipdstip(ip_p, dstip);
+  setipdata(ip_p, ip_p->header + 20 * (sizeof(char)));
   setiptlen(ip_p, tlen);
-  //if(hchksum == 0xFFFF)
-   // setiphchksum(ip_p, calculateipchecksum(ip_p));
+  //if(hchksum == 0xFFFF) setiphchksum(ip_p, calculateipchecksum(ip_p));
 }
 
-
-
-/// Data, byte array, such an an ICMP message
-/// Manually update TLen and Hchksum
+// Data, byte array, such an an ICMP message
+// Manually update TLen and Hchksum
 // member __.Data with get ()     = data and
                     // set(value) = data <- value
 
@@ -510,8 +547,12 @@ int mod_test(){
 // IP TESTS //
 
 int test_initip(){
-  printf("start of test_initip\n");
-  ip[0].header = buf[0];
+  int show = 0;
+  int res = 1; //test ok
+  if(show) printf("start of test_initip\n");
+
+  // ip test
+  ip[0].header = buf[0]; //todo: check
   initip(&ip[0],
          4,          // ver
          5,          // hdrwrds
@@ -520,17 +561,39 @@ int test_initip(){
          0,          // flags
          0,          // foff
          10,         // ttl
-         1,          // prot 
+         0x11,          // prot, icmp:1, udp:17
          0x01020304, // srcip
          0x01020305, // dstip
-                     //int* data,
-         20,         // tlen, todo:not corrrect
+                     // int* data
+         20,         // tlen, todo:not correct
          0xFFFF);    // int hchksum  (0xFFFF will leave it alone)
 
-  if(!(getiptlen(&ip[0]) == 20))
-    printf("Error: getiptlen(ip[0])==%d\n", getiptlen(&ip[0]));
-  else
-    printf("Ok: getiptlen(ip[0])==%d\n", getiptlen(&ip[0]));
+  if(!(getiptlen(&ip[0]) == 20)){
+    if(show) printf("Error: getiptlen(ip[0])==%d\n", getiptlen(&ip[0]));
+    res = 0; // test fail
+  }
+  else{
+    if(show) printf("Ok: getiptlen(ip[0])==%d\n", getiptlen(&ip[0]));
+  }
+
+  // with udp payload
+  udp[0].header = ip[0].data;
+  initudp(&udp[0],
+          4321,         // int srcport,
+          1234,         // int dstport,
+          8+2,          // int len, 
+          0xFFFF,       // int chksum (will be calculated if called with 0xFFFF)
+          (char[2]){0x62, 0x62}, // some data
+          2);           // how much data (in elements, i.e., char(s))
+
+  if(!(getudplen(&udp[0]) == 10)){
+    if(show) printf("Error: getudplen(udp[0])==%d\n", getudplen(&udp[0]));
+    res = 0; // test fail
+  }
+  else{
+    if(show) printf("Ok: getudplen(udp[0])==%d\n", getudplen(&udp[0]));
+  }
+  return res;
 }
           
 
@@ -538,7 +601,7 @@ int test_initip(){
 
 // insert new unittests here
 int dotest(){
-  int show = 0; // set to 1 if intermediate results are desired
+  int show = 1; // set to 1 if intermediate results are desired
   int res = 1; //test ok
   // some tests
   if(!checksum_test()) {
@@ -553,6 +616,10 @@ int dotest(){
     if(show) printf("mod_test() failed\n");
     res = 0; // test fail
   }
+  if(!test_initip()) {
+    if(show) printf("test_initip() failed\n");
+    res = 0; // test fail
+  }
   return res; 
 }
 
@@ -563,17 +630,17 @@ int dotest(){
 // Basic testing
 int main() {
   printf("Hello tpip world! \n\n");
-  //if(!dotest())
+  if(!dotest())
   //  printf("testing: one or more uit tests failed\n\n");
 
   // temp ip test
-  //test_initip();
+  test_initip();
 
   
 
   // mod call that only works with -O0 and not with -O2
   // when running make wcet
-  printf("mod(3,2)=%d", mod(3,2));
+  //printf("mod(3,2)=%d", mod(3,2));
 
   return 0;
 }
