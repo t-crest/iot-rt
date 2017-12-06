@@ -563,10 +563,17 @@ int dotest(){
 // Basic testing
 int main() {
   printf("Hello tpip world! \n\n");
-  if(!dotest())
-    printf("testing: one or more uit tests failed\n\n");
+  //if(!dotest())
+  //  printf("testing: one or more uit tests failed\n\n");
 
-  test_initip();
+  // temp ip test
+  //test_initip();
+
+  
+
+  // mod call that only works with -O0 and not with -O2
+  // when running make wcet
+  printf("mod(3,2)=%d", mod(3,2));
 
   return 0;
 }
