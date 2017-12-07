@@ -673,3 +673,19 @@ int main() {
 //   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 //   |     Data ...
 //   +-+-+-+-+-
+
+//Code review
+
+//1. Why not having the IP and UDP fields as part of the struct?
+
+//2. Char for the buffer is kind of ok. But word access is more efficient (Do er care?). Anyway, in C one can cast anything to anything. It is just memory. But the words must be aligned on word boundary for Patmos.
+
+//3. There are no connections between your array of IP structs and your buffers.
+
+//4. waitfornextperiod contains a classic mistake as it waits for some time and does not increments a variable with the period. See as a solution: https://github.com/t-crest/iot-rt/blob/master/src/main/scala/rtapi/RtThread.scala Essentioal is line 37
+
+//5. checksum: you could also pad the buffer with missing zeros and have a single loop. When done unconditinally then the buffer needs to be a little bit longer (3 bytes). [...]
+
+//6. UDP field code: with a struct access to the indicidual fields is easier. Maybe not even needing functions for this.
+
+//7. Same for IP.
