@@ -6,6 +6,20 @@
   License: Simplified BSD
 */
 
+//*****************************************************************************
+// RATIONALE
+//*********************************************************************
+
+// Rationale:
+// The rationale in the stack is to focus on the 'MAX_BUF_NUM' buffers. Each
+// buffer is of length 'MAX_BUF_SIZE' with type 'unsigned char' (same as 'uint8_t').
+// There are structs for each layer in the stack (.., IP, UDP, ..). Each struct holds
+// pointer(s) to places in the associated buffer. The buffer is not manipulated directly,
+// but accessed with get/set functions that take a struct pointer as argument; this struct
+// holds the addresses of the header and data. Both the buffers and the structs are statically
+// allocated. In example, udp[2], ip[2], and buf[2] are connected by index 2.  
+// 
+// Toolchain:
 // patmos-clang -O2 -mserialize=checksumwcet.pml checksumwcet.c
 // platin wcet -i checksumwcet.pml -b a.out -e checksum --report
 // checksum is the analysis entry point that would be inlined with -O2
@@ -21,13 +35,13 @@
 typedef struct ipstruct_t ipstruct_t;
 typedef struct udpstruct_t {
    ipstruct_t* ipstructp;
-   char* header; // also the ip "data" 
-   char* data;   // this is the udp data
+   unsigned char* header; // also the ip "data" 
+   unsigned char* data;   // this is the udp data
 } udpstruct_t;
 
 typedef struct ipstruct_t {
-   char* header;
-   char* data; // this is the udp header
+   unsigned char* header;
+   unsigned char* data; // this is the udp header
 } ipstruct_t;
 
 //*****************************************************************************
@@ -42,11 +56,11 @@ typedef struct ipstruct_t {
 #define MAX_BUF_NUM 4
 // bytes in multiples of 4
 // very important WCET parameter
-#define MAX_BUF_SIZE 1024
+#define MAX_BUF_SIZE 1600
 // fixed, static buffers to enable WCET analysis
-static char buf[MAX_BUF_NUM][MAX_BUF_SIZE];///4];
+static unsigned char buf[MAX_BUF_NUM][MAX_BUF_SIZE];///4];
 // length of each buffer (in bytes)
-static char bufbytes[MAX_BUF_NUM];
+static unsigned char bufbytes[MAX_BUF_NUM];
 
 // UDP PROTOCOL //
 static udpstruct_t udp[MAX_BUF_NUM];
@@ -152,18 +166,23 @@ int datasum(char data[], int arraysize){
   return datachecksum;
 }
 
-// adds in the potntial carries and finally inverts
-int calculateipchecksum(int chksumcarry) __attribute__((noinline));
-int calculateipchecksum(int chksumcarry) {
-  int checksum = chksumcarry;
+// ip header checksum calculation
+int calculateipchecksum(ipstruct_t* ip_p) __attribute__((noinline));
+int calculateipchecksum(ipstruct_t* ip_p) {
+  unsigned char* h = ip_p->header;
+  int checksum = ((h[0] <<8)+h[1])  + ((h[2] <<8)+h[3])  + 
+                 ((h[4] <<8)+h[5])  + ((h[6] <<8)+h[7])  + 
+                 ((h[8] <<8)+h[9])  + // ignore old checksum: (h[10]<<8)+h[11]
+                 ((h[12]<<8)+h[13]) + ((h[14]<<8)+h[15]) + 
+                 ((h[16]<<8)+h[17]) + ((h[18]<<8)+h[19]);  
   if ((checksum & 0xFFFF0000) > 0)
-    checksum = (checksum > 16) + (checksum & 0x0000FFFF);
+    checksum = (checksum >> 16) + (checksum & 0x0000FFFF);
   if ((checksum & 0xFFFF0000) > 0)
-    checksum = (checksum > 16) + (checksum & 0x0000FFFF);
+    checksum = (checksum >> 16) + (checksum & 0x0000FFFF);
   if ((checksum & 0xFFFF0000) > 0)
-    checksum = (checksum > 16) + (checksum & 0x0000FFFF);
-  checksum = ~checksum;
-  return checksum & 0x0000FFFF;
+    checksum = (checksum >> 16) + (checksum & 0x0000FFFF);
+  checksum = (~checksum) & 0x0000FFFF;
+  return checksum;
 }
 
 //*****************************************************************************
@@ -199,8 +218,8 @@ int getudpsrcport(udpstruct_t* udp_p) {
 }
 
 void setudpsrcport(udpstruct_t* udp_p, int value){
-  udp_p->header[0] = (char) (value >> 8);
-  udp_p->header[1] = (char) value;
+  udp_p->header[0] = (unsigned char) (value >> 8);
+  udp_p->header[1] = (unsigned char) value;
 }
 
 // UDP destination port
@@ -209,8 +228,8 @@ int getudpdstport(udpstruct_t* udp_p) {
 }
 
 void setudpdstport(udpstruct_t* udp_p, int value){
-  udp_p->header[2] = (char) (value >> 8); 
-  udp_p->header[3] = (char) value;
+  udp_p->header[2] = (unsigned char) (value >> 8); 
+  udp_p->header[3] = (unsigned char) value;
 }
 
 // UDP length
@@ -219,8 +238,8 @@ int getudplen(udpstruct_t* udp_p){
 }                     
 
 void setudplen(udpstruct_t* udp_p, int value){
-  udp_p->header[4] = (char) (value >> 8);
-  udp_p->header[5] = (char) value;
+  udp_p->header[4] = (unsigned char) (value >> 8);
+  udp_p->header[5] = (unsigned char) value;
 } 
 
 int getudpchksum(udpstruct_t* udp_p){
@@ -228,17 +247,17 @@ int getudpchksum(udpstruct_t* udp_p){
 }     
 
 void setudpchksum(udpstruct_t* udp_p, int value){
-  udp_p->header[6] = (char) (value >> 8);
-  udp_p->header[7] = (char) value;
+  udp_p->header[6] = (unsigned char) (value >> 8);
+  udp_p->header[7] = (unsigned char) value;
 } 
 
 // udp data
-char* getudpdata(udpstruct_t* udp_p){
+unsigned char* getudpdata(udpstruct_t* udp_p){
   return udp_p->data;
 }
 
-void setudpdata(udpstruct_t* udp_p, char* data, int datacount){
-  udp_p->data = udp_p->header + 8 * (sizeof(char)); //udp header is 8 bytes
+void setudpdata(udpstruct_t* udp_p, unsigned char* data, int datacount){
+  udp_p->data = udp_p->header + 8 * (sizeof(unsigned char)); //udp header is 8 bytes
   //todo _Pragma
   for(int i=0; i < datacount; i++){
     udp_p->data[i] = data[i];
@@ -253,7 +272,7 @@ void initudp(udpstruct_t* udp_p,
                    int dstport,
                    int len, 
                    int chksum, // to be calculated, call with 0xFFFF
-                   char* data,
+                   unsigned char* data,
                    int datacount
                    ) 
 {
@@ -271,19 +290,18 @@ void initudp(udpstruct_t* udp_p,
 //  0                   1                   2                   3
 //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |Version|  IHL  |Type of Service|          Total Length         |
+// |Version|  IHL  |Type of Service|          Total Length         |4500 0073    0.. 3
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |         Identification        |Flags|      Fragment Offset    |
+// |         Identification        |Flags|      Fragment Offset    |0000 4000    4.. 7
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |  Time to Live |    Protocol   |         Header Checksum       |
+// |  Time to Live |    Protocol   |         Header Checksum       |4011 *b861*  8..11 (*10..11*)
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       Source Address                          |
+// |                       Source Address                          |c0a8 0001   12..16
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                    Destination Address                        |
+// |                    Destination Address                        |c0a8 00c7   16..19
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 // |                    Options                    |    Padding    |
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-
 //member __.Header with get()      = header and
 //                      set(value) = header <- value
 
@@ -311,7 +329,7 @@ int getiptos(ipstruct_t* ip_p){
 }
 
 void setiptos(ipstruct_t* ip_p, int value){
-  ip_p->header[1] = (char) value;
+  ip_p->header[1] = (unsigned char) value;
 }
 
 // Total length in byte, 16-bits .[2] .[3]
@@ -320,8 +338,8 @@ int getiptlen(ipstruct_t* ip_p){
 }
 
 void setiptlen(ipstruct_t* ip_p, int value){
-  ip_p->header[2] = (char) (value >> 8);
-  ip_p->header[3] = (char) value;
+  ip_p->header[2] = (unsigned char) (value >> 8);
+  ip_p->header[3] = (unsigned char) value;
 }
 
 // Identification, 16-bits, .[4] .[5]
@@ -331,8 +349,8 @@ int getipid(ipstruct_t* ip_p){
 
 void setipid(ipstruct_t* ip_p, int value){
   // check >>> or >>
-  ip_p->header[4] = (char) value >> 8;
-  ip_p->header[5] = (char) value;
+  ip_p->header[4] = (unsigned char) value >> 8;
+  ip_p->header[5] = (unsigned char) value;
 }
 
 // Flags, 3-bits, .[6H]
@@ -341,7 +359,7 @@ int getflags(ipstruct_t* ip_p){
 }
 
 void setipflags(ipstruct_t* ip_p, int value){
-  ip_p->header[6] = (char) ((value & FLAGS_MASK) << 5) | (ip_p->header[6] & 0x1F); //0001_1111
+  ip_p->header[6] = (unsigned char) ((value & FLAGS_MASK) << 5) | (ip_p->header[6] & 0x1F); //0001_1111
 }
 
 // Fragment offset, 13-bits, .[6L] .[7]
@@ -350,8 +368,8 @@ int getipfoff(ipstruct_t* ip_p){
 }
 
 void setipfoff(ipstruct_t* ip_p, int value){
-  ip_p->header[6] = (char) (ip_p->header[6] & 0xE0) | (value >> 8);
-  ip_p->header[7] = (char) value;
+  ip_p->header[6] = (unsigned char) (ip_p->header[6] & 0xE0) | (value >> 8);
+  ip_p->header[7] = (unsigned char) value;
 }
 
 // Time to live, 8-bits, .[8]
@@ -360,7 +378,7 @@ int getipttl(ipstruct_t* ip_p) {
 }
 
 void setipttl(ipstruct_t* ip_p, int value){
-  ip_p->header[8] = (char) value;
+  ip_p->header[8] = (unsigned char) value;
 }
 
 // Protocol, 8-bits, .[9]
@@ -369,7 +387,7 @@ int getipprot(ipstruct_t* ip_p) {
 } 
                       
 void setipprot(ipstruct_t* ip_p, int value){
-  ip_p->header[9] = (char) value;
+  ip_p->header[9] = (unsigned char) value;
 }
 
 // Checksum, 16-bits, .[10] .[11]
@@ -378,8 +396,8 @@ int getiphchksum(ipstruct_t* ip_p) {
 }
 
 void setiphchksum(ipstruct_t* ip_p, int value){
-  ip_p->header[10] = (char) (value >> 8);
-  ip_p->header[11] = (char) value;
+  ip_p->header[10] = (unsigned char) (value >> 8);
+  ip_p->header[11] = (unsigned char) value;
 }
 
 // Source IP, 32-bits, .[12] .[13] .[14] .[15]
@@ -389,10 +407,10 @@ int getipsrcip (ipstruct_t* ip_p) {
 }                    
 
 void setipsrcip(ipstruct_t* ip_p, int value){
-  ip_p->header[12] = (char) (value >> 24); // check the shift
-  ip_p->header[13] = (char) (value >> 16);
-  ip_p->header[14] = (char) (value >> 8);
-  ip_p->header[15] = (char) value;
+  ip_p->header[12] = (unsigned char) (value >> 24); // check the shift
+  ip_p->header[13] = (unsigned char) (value >> 16);
+  ip_p->header[14] = (unsigned char) (value >> 8);
+  ip_p->header[15] = (unsigned char) value;
 } 
 
 // Destination IP, 32-bits, .[16] .[17] .[18] .[19]
@@ -402,18 +420,18 @@ int getipdstip(ipstruct_t* ip_p){
 }                    
 
 void setipdstip(ipstruct_t* ip_p, int value) {
-  ip_p->header[16] = (char) (value >> 24);
-  ip_p->header[17] = (char) (value >> 16);
-  ip_p->header[18] = (char) (value >> 8);
-  ip_p->header[19] = (char) value;
+  ip_p->header[16] = (unsigned char) (value >> 24);
+  ip_p->header[17] = (unsigned char) (value >> 16);
+  ip_p->header[18] = (unsigned char) (value >> 8);
+  ip_p->header[19] = (unsigned char) value;
 }
 
 // payload data (such as ICMP, UDP, or TCP message)
-char* getipdata(ipstruct_t* ip_p){
+unsigned char* getipdata(ipstruct_t* ip_p){
   return ip_p->data;
 }
 
-void setipdata(ipstruct_t* ip_p, char* data){
+void setipdata(ipstruct_t* ip_p, unsigned char* data){
   ip_p->data = data;
 }
 
@@ -445,7 +463,7 @@ void initip(ipstruct_t* ip_p,
   setipprot(ip_p, prot);
   setipsrcip(ip_p, srcip);
   setipdstip(ip_p, dstip);
-  setipdata(ip_p, ip_p->header + 20 * (sizeof(char)));
+  setipdata(ip_p, ip_p->header + 20 * (sizeof(unsigned char)));
   setiptlen(ip_p, tlen);
   //if(hchksum == 0xFFFF) setiphchksum(ip_p, calculateipchecksum(ip_p));
 }
@@ -510,30 +528,30 @@ int timer_test() {
 // CHECKSUM TESTS //
 
 int checksum_test(){
-  int res = 0;
-  char mydata[] = {0x01, 0x02, 0x03, 0x04};
-  //printf("elems in mydata=%lu\n",sizeof(mydata)/sizeof(mydata[0]));
-  int chksum = datasum(mydata, sizeof(mydata)/sizeof(mydata[0]));
-  if (chksum == 0x0406) res = 1;
-  else res = 0;
-  //printf("Checksum: 0x%X\n", chksum);
-  char mydata2[] = {0x01, 0x02, 0x03};
-  int chksum2 = datasum(mydata2, sizeof(mydata2)/sizeof(mydata2[0]));
-  if (chksum == 0x0402) res = 1;
-  else res = 0;
-  //printf("Checksum2: 0x%X\n", chksum2);
-  //checksum_test2(mydata);
-  // 0xb861 is the checksum
-  // 4500 0073 0000 4000 4011 *b861* c0a8 0001 c0a8 00c7
-  char mydata3[] = {0x45, 0x00, 0x00, 0x73, 0x00, 0x00,
-                    0x40, 0x00, 0x40, 0x11,  0xb8, 0x61, 0xc0, 0xa8,
-                    0x00, 0x01, 0xc0, 0xa8, 0x00, 0xc7};
-  int chksum3 = datasum(mydata3, sizeof(mydata3)/sizeof(mydata3[0]));
-  //printf("...chksum3=0x%X\n", chksum3);
-  chksum3 = calculateipchecksum(chksum3);
-  if (chksum3 == 0x0000) res = 1;
-  else res = 0;
-  //printf("Checksum3: 0x%X\n", chksum3);
+  int res = 1; //ok
+
+  // Test 1: 0xb861 is the checksum
+  //   0..3|Version|  IHL  |Type of Service|          Total Length         |4500 0073    
+  //       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  //   4..7|         Identification        |Flags|      Fragment Offset    |0000 4000    
+  //       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  //  8..11|  Time to Live |    Protocol   |         Header Checksum       |4011 *b861*  8..11 (*10..11*)
+  //       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  // 12..16|                       Source Address                          |c0a8 0001   12..16
+  //       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  // 16..19|                    Destination Address                        |c0a8 00c7   16..19
+  unsigned char ipdata[] = {0x45, 0x00, 0x00, 0x73, 
+                   0x00, 0x00, 0x40, 0x00, 
+                   0x40, 0x11, 0xFF, 0xFF, // checksum  is 'set' to 0xFFFF
+                   0xc0, 0xa8, 0x00, 0x01,
+                   0xc0, 0xa8, 0x00, 0xc7};
+
+  ip[0].header = ipdata;
+  int checksum = calculateipchecksum(&ip[0]);
+//printf("checksum_test=%08x\n", checksum);
+
+  if (checksum != 0xb861) res = 0; //failed test
+
   return res;
 }
 
@@ -583,7 +601,7 @@ int test_initip(){
           1234,         // int dstport,
           8+2,          // int len, 
           0xFFFF,       // int chksum (will be calculated if called with 0xFFFF)
-          (char[2]){0x62, 0x62}, // some data
+          (unsigned char[2]){0x62, 0x62}, // some data
           2);           // how much data (in elements, i.e., char(s))
 
   if(!(getudplen(&udp[0]) == 10)){
@@ -600,7 +618,7 @@ int test_initip(){
 // final tests //
 
 // insert new unittests here
-int dotest(){
+int tests(){
   int show = 1; // set to 1 if intermediate results are desired
   int res = 1; //test ok
   // some tests
@@ -630,19 +648,38 @@ int dotest(){
 // Basic testing
 int main() {
   printf("Hello tpip world! \n\n");
-  if(!dotest())
-  //  printf("testing: one or more uit tests failed\n\n");
+  if(!tests())
+    printf("testing: one or more unit tests failed\n\n");
+  else
+    printf("testing: all tests ok\n\n");
 
   // temp ip test
-  test_initip();
-
+  //test_initip();
   
+  // 4500 0073 0000 4000 4011 *b861* c0a8 0001 c0a8 00c7 
+  // gives 0x0000 if 0xb861 is added in
+  //int sum                   = 0x4500 + 0x0073 + 0x0000 + 0x4000 + 0x4011 + 
+  //                            0xc0a8 + 0x0001 + //0xB861 +
+  //                            0xc0a8 + 0x00c7;
+  //printf("sum               = 0x%08X\n", sum);
+  //int carry                 = (sum & 0xFFFF0000) >> 16;
+  //printf("carry             = 0x%08X\n", carry);
+  //int sum16                 = sum & 0x0000FFFF;
+  //printf("sum16             = 0x%08X\n", sum16);
+  //int sum16pluscarry        = sum16 + carry;
+  //printf("sum16pluscarry    = 0x%08X\n", sum16pluscarry);
+  //int checksum              = (~sum16pluscarry) & 0x0000FFFF;
+  //printf("checksum '0xb861' = 0x%08X\n", checksum);
 
   // mod call that only works with -O0 and not with -O2
   // when running make wcet
   //printf("mod(3,2)=%d", mod(3,2));
 
-  return 0;
+  //unsigned char a = 0x80;
+  //unsigned char b = 0x01;
+  //int aplusb = a + b;
+  //printf("m1)sum=0x%x\n",aplusb);
+
 }
 
 //*****************************************************************************
@@ -677,15 +714,21 @@ int main() {
 //Code review
 
 //1. Why not having the IP and UDP fields as part of the struct?
+//https://stackoverflow.com/questions/15612488/what-good-is-a-function-pointer-inside-a-struct-in-c
 
 //2. Char for the buffer is kind of ok. But word access is more efficient (Do er care?). Anyway, in C one can cast anything to anything. It is just memory. But the words must be aligned on word boundary for Patmos.
 
+
 //3. There are no connections between your array of IP structs and your buffers.
+
 
 //4. waitfornextperiod contains a classic mistake as it waits for some time and does not increments a variable with the period. See as a solution: https://github.com/t-crest/iot-rt/blob/master/src/main/scala/rtapi/RtThread.scala Essentioal is line 37
 
+
 //5. checksum: you could also pad the buffer with missing zeros and have a single loop. When done unconditinally then the buffer needs to be a little bit longer (3 bytes). [...]
 
+
 //6. UDP field code: with a struct access to the indicidual fields is easier. Maybe not even needing functions for this.
+
 
 //7. Same for IP.
