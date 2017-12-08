@@ -10,7 +10,7 @@ wcet:
 	@echo ' '
 	@echo '*********************************************************'
 	@echo '*********************************************************'
-	@echo '**********************NEW BUILD**************************'
+	@echo '**********************NEW WCET***************************'
 	@echo '*********************************************************'
 	@echo '*********************************************************'
 	@echo ' '
@@ -19,7 +19,11 @@ wcet:
 	#patmos-clang -O0 -mserialize=tpip.pml tpip.c
 	#the function to be analyzed in listed just before --report
 	#functions: checksum waitfornextperiod wait
-	platin wcet -i tpip.pml -b a.out -e mod --report
+	#platin wcet -i tpip.pml -b a.out -e getipdstip  --report
+	#platin wcet -i tpip.pml -b a.out -e wait --report
+	#platin wcet -i tpip.pml -b a.out -e waitfornextperiod --report
+	platin wcet -i tpip.pml -b a.out -e currenttimemillis --report
+	#platin wcet -i tpip.pml -b a.out -e calculateipchecksum --report
 
 all:
 	@echo ' '

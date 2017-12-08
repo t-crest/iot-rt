@@ -26,6 +26,7 @@
 
 #include <stdio.h>
 #include <sys/time.h>
+#include <time.h> // 'clock_t' and 'clock()'
 
 //*****************************************************************************
 // FORWARD DECLARATIONS (only on a "need-to" basis)
@@ -50,6 +51,9 @@ typedef struct ipstruct_t {
 
 // period length (ms). Can also be cycles if on 'bare metal'
 #define PERIOD 1000 // must be less than 2,147,483,647
+
+// used by 'int currenttimemillis()'
+#define CLOCKS_PER_MSEC (CLOCKS_PER_SEC/1000)
 
 // one 'BUF' is one packet/message
 // very important WCET parameter
@@ -86,16 +90,31 @@ static ipstruct_t ip[MAX_BUF_NUM];
 
 // function for getting number of milliseconds since "system-epoc"
 // used with waitfornextperiod
-int currenttimemillis() __attribute__((noinline));
-int currenttimemillis(){
-  struct timeval timenow;
-  gettimeofday(&timenow, NULL);
-  long long int msec = ((long long int) timenow.tv_sec) * 1000LL
-    + (long long int) timenow.tv_usec / 1000LL;
+
+typedef struct atype_t {
+  int x;
+}atype_t;
+
+
+__attribute__((noinline)) int currenttimemillis(){
+  //atype_t atype;
+
+  //volatile struct timeval timenow;
+  //gettimeofday(&timenow, NULL);
+
+  clock_t start_t;
+  start_t = clock();
+  int mstime = ((unsigned int)start_t/(unsigned int)CLOCKS_PER_MSEC);
+
+  //volatile long long int msec = 0;
+  //msec = timenow.tv_sec;
+//msec = msec + ((/*long long*/ int) timenow.tv_sec) ;//* 1000LL;
+//msec = msec + atype.x; //((long long int) timenow.tv_sec) ;//* 1000LL;
+//msec = msec  + (long long int) timenow.tv_usec / 1000LL;
   // push "epoc" from 1970 to now - approx. 277 hrs
   //   to having 'long long int' everywhere
-  msec = msec - 1511e9;
-  return (int)msec;
+  //msec = msec - 1511e9;
+  return mstime;
 }
 
 //spins for a number of ms
@@ -125,11 +144,13 @@ void initwaitfornextperiod(){
 //   so not including the rest of the PERIOD
 // if return value is greater then PERIOD, it might indicate a deadline problem
 //todo: validate/check with ms scala code
-int waitfornextperiod(){
-  int totalwait = currenttimemillis() - _start;
-  int waitfor = PERIOD - ((currenttimemillis() - _start) % PERIOD);
-  wait(waitfor);
-  _start = currenttimemillis();
+__attribute__ ((noinline))  int waitfornextperiod(){
+  volatile int totalwait = 0;//currenttimemillis() - _start;//
+//int waitfor = PERIOD - ((currenttimemillis() - _start) % PERIOD);
+//wait(waitfor);
+  //_start = currenttimemillis();
+  struct timeval timenow;
+  gettimeofday(&timenow, NULL);
   return totalwait;
 }
 
@@ -414,7 +435,8 @@ void setipsrcip(ipstruct_t* ip_p, int value){
 } 
 
 // Destination IP, 32-bits, .[16] .[17] .[18] .[19]
-int getipdstip(ipstruct_t* ip_p){
+//int getipdstip(ipstruct_t* ip_p) __attribute__((noinline));
+__attribute__ ((noinline))  int getipdstip(ipstruct_t* ip_p){
   return (ip_p->header[16] << 24) | (ip_p->header[17] << 16) |
          (ip_p->header[18] <<  8) | ip_p->header[19];  
 }                    
@@ -535,23 +557,20 @@ int checksum_test(){
   //       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
   //   4..7|         Identification        |Flags|      Fragment Offset    |0000 4000    
   //       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  //  8..11|  Time to Live |    Protocol   |         Header Checksum       |4011 *b861*  8..11 (*10..11*)
+  //  8..11|  Time to Live |    Protocol   |         Header Checksum       |4011 *b861* 
   //       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  // 12..16|                       Source Address                          |c0a8 0001   12..16
+  // 12..16|                       Source Address                          |c0a8 0001
   //       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  // 16..19|                    Destination Address                        |c0a8 00c7   16..19
+  // 16..19|                    Destination Address                        |c0a8 00c7
   unsigned char ipdata[] = {0x45, 0x00, 0x00, 0x73, 
                    0x00, 0x00, 0x40, 0x00, 
                    0x40, 0x11, 0xFF, 0xFF, // checksum  is 'set' to 0xFFFF
                    0xc0, 0xa8, 0x00, 0x01,
                    0xc0, 0xa8, 0x00, 0xc7};
-
   ip[0].header = ipdata;
   int checksum = calculateipchecksum(&ip[0]);
 //printf("checksum_test=%08x\n", checksum);
-
   if (checksum != 0xb861) res = 0; //failed test
-
   return res;
 }
 
@@ -568,7 +587,6 @@ int test_initip(){
   int show = 0;
   int res = 1; //test ok
   if(show) printf("start of test_initip\n");
-
   // ip test
   ip[0].header = buf[0]; //todo: check
   initip(&ip[0],
@@ -613,7 +631,16 @@ int test_initip(){
   }
   return res;
 }
-          
+
+// WCET "tests": just here to platin can reach the code from main
+//void testwcet() __attribute__((noinline));
+void testwcet(){
+  // 'volatile' is important so gcc does not optimize the function call
+  // and then platin can't find it...
+  volatile int foo = -1;
+  foo = getipdstip(&ip[0]);
+  foo = waitfornextperiod();
+}
 
 // final tests //
 
@@ -655,6 +682,9 @@ int main() {
 
   // temp ip test
   //test_initip();
+  testwcet();
+  //int foobar = bar + bar;
+  //printf("\n", foobar);
   
   // 4500 0073 0000 4000 4011 *b861* c0a8 0001 c0a8 00c7 
   // gives 0x0000 if 0xb861 is added in
@@ -679,7 +709,6 @@ int main() {
   //unsigned char b = 0x01;
   //int aplusb = a + b;
   //printf("m1)sum=0x%x\n",aplusb);
-
 }
 
 //*****************************************************************************
