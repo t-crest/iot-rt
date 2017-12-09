@@ -25,7 +25,7 @@
 // checksum is the analysis entry point that would be inlined with -O2
 
 #include <stdio.h>
-#include <sys/time.h>
+//#include <sys/time.h>
 #include <time.h> // 'clock_t' and 'clock()'
 
 //*****************************************************************************
@@ -145,12 +145,12 @@ void initwaitfornextperiod(){
 // if return value is greater then PERIOD, it might indicate a deadline problem
 //todo: validate/check with ms scala code
 __attribute__ ((noinline))  int waitfornextperiod(){
-  volatile int totalwait = 0;//currenttimemillis() - _start;//
-//int waitfor = PERIOD - ((currenttimemillis() - _start) % PERIOD);
-//wait(waitfor);
-  //_start = currenttimemillis();
-  struct timeval timenow;
-  gettimeofday(&timenow, NULL);
+  volatile int totalwait = currenttimemillis() - _start;//
+  int waitfor = PERIOD - ((currenttimemillis() - _start) % PERIOD);
+  wait(waitfor);
+  _start = currenttimemillis();
+  //struct timeval timenow;
+  //gettimeofday(&timenow, NULL);
   return totalwait;
 }
 

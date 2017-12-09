@@ -21,8 +21,8 @@ wcet:
 	#functions: checksum waitfornextperiod wait
 	#platin wcet -i tpip.pml -b a.out -e getipdstip  --report
 	#platin wcet -i tpip.pml -b a.out -e wait --report
-	#platin wcet -i tpip.pml -b a.out -e waitfornextperiod --report
-	platin wcet -i tpip.pml -b a.out -e currenttimemillis --report
+	platin wcet -i tpip.pml -b a.out -e waitfornextperiod --report
+	#platin wcet -i tpip.pml -b a.out -e currenttimemillis --report
 	#platin wcet -i tpip.pml -b a.out -e calculateipchecksum --report
 
 all:
