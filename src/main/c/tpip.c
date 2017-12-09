@@ -25,7 +25,7 @@
 // checksum is the analysis entry point that would be inlined with -O2
 
 #include <stdio.h>
-//#include <sys/time.h>
+#include <string.h> // memcpy
 #include <time.h> // 'clock_t' and 'clock()'
 
 //*****************************************************************************
@@ -50,7 +50,7 @@ typedef struct ipstruct_t {
 //*****************************************************************************
 
 // period length (ms). Can also be cycles if on 'bare metal'
-#define PERIOD 1000 // must be less than 2,147,483,647
+#define PERIOD 100// 1000 // must be less than 2,147,483,647
 
 // used by 'int currenttimemillis()'
 #define CLOCKS_PER_MSEC (CLOCKS_PER_SEC/1000)
@@ -149,8 +149,6 @@ __attribute__ ((noinline))  int waitfornextperiod(){
   int waitfor = PERIOD - ((currenttimemillis() - _start) % PERIOD);
   wait(waitfor);
   _start = currenttimemillis();
-  //struct timeval timenow;
-  //gettimeofday(&timenow, NULL);
   return totalwait;
 }
 
@@ -511,7 +509,7 @@ void initip(ipstruct_t* ip_p,
 // TIMER TESTS //
 
 int timer_test() {
-  int res = 0;
+  int res = 1; // set test to "ok" to begin with
   // to see more, then set show to 1
   int show = 0;
   if(show) printf("timer_test!\n");
@@ -530,6 +528,9 @@ int timer_test() {
   wait(123); // 'wait(321)' will give a false test
   if(show) printf("Timer before 'waitforoneperiod()':  %10d ms \n", currenttimemillis());
   int elapsed2 = waitfornextperiod();
+  // test result fail?
+  if (elapsed2 != 123)
+    res = 0;
   if(show) printf("Timer after 'waitforoneperiod()':   %10d ms \n", currenttimemillis());
   if(show) printf("Elapsed time since prev. wfnp call: %10d ms \n", elapsed2);
   //1 ms left
@@ -537,12 +538,11 @@ int timer_test() {
   if(show) printf("Deadline (-1, so hurry up!):        %10d ms \n", deadline());
   //broke deadline
   waitfornextperiod();
-  wait(1666);
+  // disable if you want to skip the wait for 1 sec
+  // wait(1001);
   if(deadline())
-    if(show) printf("Deadline (+666, bye bye...):        %10d ms \n", deadline());
-  // test result ok?
-  if (elapsed2 == 123)
-    res = 1;
+    if(show) printf("Deadline (+1, bye bye...):        %10d ms \n", deadline());
+
   if(show) printf("\ntimer_test result: %s\n", res ? "true" : "false");
   return res;
 }
@@ -700,6 +700,7 @@ int main() {
   //printf("sum16pluscarry    = 0x%08X\n", sum16pluscarry);
   //int checksum              = (~sum16pluscarry) & 0x0000FFFF;
   //printf("checksum '0xb861' = 0x%08X\n", checksum);
+  
 
   // mod call that only works with -O0 and not with -O2
   // when running make wcet
@@ -709,6 +710,136 @@ int main() {
   //unsigned char b = 0x01;
   //int aplusb = a + b;
   //printf("m1)sum=0x%x\n",aplusb);
+
+  // dump to file
+  unsigned char  pcapdata[2048];
+  unsigned char* pcapdataptr = pcapdata;
+
+  // global header
+  //typedef struct pcap_hdr_s {
+  //  guint32 magic_number;   /* magic number */
+  //  guint16 version_major;  /* major version number */
+  //  guint16 version_minor;  /* minor version number */
+  //  gint32  thiszone;       /* GMT to local correction */
+  //  guint32 sigfigs;        /* accuracy of timestamps */
+  //  guint32 snaplen;        /* max length of captured packets, in octets */
+  //  guint32 network;        /* data link type */
+  //} pcap_hdr_t;
+  
+  unsigned int magic_number     = 0xa1b2c3d4;
+  memcpy(pcapdataptr, &magic_number, sizeof(magic_number));
+  pcapdataptr += sizeof(magic_number);
+  unsigned short version_major  = 0x2;
+  memcpy(pcapdataptr, &version_major, sizeof(version_major));
+  pcapdataptr += sizeof(version_major);
+  unsigned short version_minor  = 0x4;
+  memcpy(pcapdataptr, &version_minor, sizeof(version_minor));
+  pcapdataptr += sizeof(version_minor);
+  int thiszone                  = -3600; 
+  memcpy(pcapdataptr, &thiszone, sizeof(thiszone));
+  pcapdataptr += sizeof(thiszone);
+  unsigned int sigfigs          = 0;
+  memcpy(pcapdataptr, &sigfigs, sizeof(sigfigs));
+  pcapdataptr += sizeof(sigfigs);
+  unsigned int snaplen          = 65535;
+  memcpy(pcapdataptr, &snaplen, sizeof(snaplen));
+  pcapdataptr += sizeof(snaplen);
+  unsigned int network          = 1;
+  memcpy(pcapdataptr, &network, sizeof(network));
+  pcapdataptr += sizeof(network);
+  
+  // packet header
+  //typedef struct pcaprec_hdr_s {
+  //  guint32 ts_sec;         /* timestamp seconds */
+  //  guint32 ts_usec;        /* timestamp microseconds */
+  //  guint32 incl_len;       /* number of octets of packet saved in file */
+  //  guint32 orig_len;       /* actual length of packet */
+  //} pcaprec_hdr_t; 
+  unsigned int ts_sec   = time(NULL);
+  memcpy(pcapdataptr, &ts_sec, sizeof(ts_sec));
+  pcapdataptr += sizeof(ts_sec);
+  unsigned int ts_usec  = 0; 
+  memcpy(pcapdataptr, &ts_usec, sizeof(ts_usec));
+  pcapdataptr += sizeof(ts_usec);
+  unsigned int incl_len = 14 + 20;
+  memcpy(pcapdataptr, &incl_len, sizeof(incl_len));
+  pcapdataptr += sizeof(incl_len);
+  unsigned int orig_len = incl_len;
+  memcpy(pcapdataptr, &orig_len, sizeof(orig_len));
+  pcapdataptr += sizeof(orig_len);
+  
+  // ethernet
+  long long unsigned int dstethaddr = 0x010203040506;
+  memcpy(pcapdataptr, &dstethaddr, sizeof(dstethaddr));
+  pcapdataptr += sizeof(dstethaddr);
+  long long unsigned int srcethaddr = 0x020304050607;
+  memcpy(pcapdataptr, &srcethaddr, sizeof(srcethaddr));
+  pcapdataptr += sizeof(srcethaddr);
+  unsigned short         etype      = 0x0800; //0x0800 IPv4
+  memcpy(pcapdataptr, &etype, sizeof(etype));
+  pcapdataptr += sizeof(etype);
+  
+  //IP v4
+  // RFC 791:  Internet Header Format
+  //  0                   1                   2                   3
+  //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+  // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  // |Version|  IHL  |Type of Service|          Total Length         |4500 0073    0.. 3
+  // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  // |         Identification        |Flags|      Fragment Offset    |0000 4000    4.. 7
+  // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  // |  Time to Live |    Protocol   |         Header Checksum       |4011 *b861*  8..11 (*10..11*)
+  // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  // |                       Source Address                          |c0a8 0001   12..16
+  // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  // |                    Destination Address                        |c0a8 00c7   16..19
+  // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  // |                    Options                    |    Padding    |
+  // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  
+  //initip(&ip[0],
+  unsigned char  verihl = 0x45;
+  memcpy(pcapdataptr, &verihl, sizeof(verihl));
+  pcapdataptr += sizeof(verihl);
+  unsigned char  tos    = 0x00; 
+  memcpy(pcapdataptr, &tos, sizeof(tos));
+  pcapdataptr += sizeof(tos);
+  unsigned short tlen   = 20;
+  memcpy(pcapdataptr, &tlen, sizeof(tlen));
+  pcapdataptr += sizeof(tlen);
+  
+  unsigned short id     = 0x0001; 
+  memcpy(pcapdataptr, &id, sizeof(id));
+  pcapdataptr += sizeof(id);
+  unsigned short ff     = 0x0000; // flags and fragment offset
+  memcpy(pcapdataptr, &ff, sizeof(ff));
+  pcapdataptr += sizeof(ff);
+  
+  unsigned char  ttl    = 10;
+  memcpy(pcapdataptr, &ttl, sizeof(ttl));
+  pcapdataptr += sizeof(ttl);
+  unsigned char  prot   = 0x11;          // prot, icmp:1, udp:0x11
+  memcpy(pcapdataptr, &prot, sizeof(prot));
+  pcapdataptr += sizeof(prot);
+  unsigned short hcksum = 0x0000;
+  memcpy(pcapdataptr, &hcksum, sizeof(hcksum));
+  pcapdataptr += sizeof(hcksum);
+  
+  unsigned int   srcip  = 0x01020304; // srcip
+  memcpy(pcapdataptr, &srcip, sizeof(srcip));
+  pcapdataptr += sizeof(srcip);
+  
+  unsigned int   dstip  = 0x01020305; // dstip
+  memcpy(pcapdataptr, &dstip, sizeof(dstip));
+  pcapdataptr += sizeof(dstip);
+
+  int size = pcapdataptr - pcapdata;
+  printf("m0) size=%d", size);
+
+  FILE *datafile = fopen("tpip.pcap","wb");  
+  fwrite(pcapdata,size,1,datafile); 
+  fclose(datafile);
+  
 }
 
 //*****************************************************************************

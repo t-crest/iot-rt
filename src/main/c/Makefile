@@ -34,6 +34,10 @@ all:
 	@echo '*********************************************************'
 	@echo ' '
 	rm -f a.out #quiet if a.out is not there
+	rm -f tpip.pcap
 	$(CC) *.c
+	@echo 'tpip.c output:'
 	./a.out
-	
+	@echo ' '
+	@echo 'tcpdump output:'
+	tcpdump -r tpip.pcap
