@@ -45,6 +45,28 @@ typedef struct ipstruct_t {
    unsigned char* data; // this is the udp header
 } ipstruct_t;
 
+// Martin thinks those different pointers are not the best way
+// to represent IP packets.
+
+
+// new proposal for using types (MS)
+// we cannot safely use shorter fields due to
+// possible different byte orders.
+
+typedef struct ip_t {
+  unsigned long length;
+  unsigned long id;
+  unsigned long prot;
+  unsigned long source;
+  unsigned long destination;
+} ip_t;
+
+// And we need to take care of byteorder (with hton() and ntoh()).
+
+// use as a start 32-bit arrays to ensure it is word aligned.
+// shall use the MAX_* when agreed on.
+static unsigned long packets[3][1600/4];
+
 //*****************************************************************************
 // CONSTANT PARAMETERS SECTION
 //*****************************************************************************
