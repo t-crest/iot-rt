@@ -47,6 +47,8 @@ typedef struct ipstruct_t {
 
 // Martin thinks those different pointers are not the best way
 // to represent IP packets.
+//  RUP->MS: Agree. Would you make a typedef for udp as well? So we can get 
+//   both to work at the same time. 
 
 
 // new proposal for using types (MS)
