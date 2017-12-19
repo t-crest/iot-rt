@@ -1,3 +1,4 @@
 *.exe
 *.o
 /bin/
+src/main/c/nocsim/a.out
