@@ -6,85 +6,118 @@
   License: Simplified BSD
 */
 
+// Notes
+// Structs are pointer
+// Data, such as flits and arrays of unsigned longs are not pointers
+
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #define flit unsigned long
 
-// configuration
-#define NUM_CORES 4
-#define RX_MEM 1
+// noc configuration
+#define MESH_ROWS 2
+#define MESH_COLS 2
+#define CORES (MESH_ROWS * MESH_COLS)
+// core configuration
 #define TX_MEM 1
+#define RX_MEM 1 * (CORES - 1) // 3
 
-// one-way-mem
-typedef struct OneWayMemory
-{
-  unsigned long** data;
-} OneWayMemory;
-
-// receiver memory
-typedef struct RXMemory
-{
-  unsigned long** data; // see RX_MEM define
-} RXMemory;
-
-// transmission memory
+// transmission one-way-memory memory
 typedef struct TXMemory
 {
-  unsigned long** data // see TX_MEM define
+  unsigned long data[TX_MEM];
 } TXMemory;
 
+// receiver one-way-memory memory
+typedef struct RXMemory
+{
+  unsigned long data[RX_MEM];
+} RXMemory;
+
+typedef struct Link Link;
+typedef struct Router Router;
 typedef struct Link
 {
-  Link* al; // another link
+  Router *r; // owner
+  Link *al;  // link to (another router) link
 } Link;
 
 // network interface
 typedef struct NetworkInterface
 {
-  Link* l; // local 
+  Link *l; // local
 } NetworkInterface;
 
-
 typedef struct Router
-{ // clockwise "enumeration" when indexed using 'link' below
-  Link* l; // local
-  Link* n; // north
-  Link* e; // east
-  Link* s; // south
-  Link* w; // west
-  Link** link; // allow indexing into l, n, e, s, w
+{
+  Link l;      // local
+  Link n;      // north
+  Link e;      // east
+  Link s;      // south
+  Link w;      // west
+  flit regout; // pipelined with a 'flit' (see 'flit' define)
 } Router;
 
 typedef struct Core
 {
   // some function to be run by the core
-  int (*run)(int)
+  //int (*run)(int)
 } Core;
 
-// 
+//
 typedef struct Tile
 {
-  Core* core;
-  RXMemory* rxmem;
-  TXMemory* txmem;
-  NetworkInterface* ni;
-  Router* router;
+  Core core;
+  TXMemory txmem;
+  RXMemory rxmem;
+  NetworkInterface ni;
+  Router router;
 } Tile;
 
 // The network-on-chip / network-of-cores structure
 typedef struct NoC
 {
-  Tile** tile;  
+  Tile tile[MESH_ROWS][MESH_COLS];
 } NoC;
 
-NoC* initnoc(){
-
-  
+// init the "network-on-chip" NoC
+void initnoc(NoC *nocp)
+{
+  // noc tiles init
+  for (int i = 0; i < MESH_ROWS; i++)
+  {
+    for (int j = 0; j < MESH_COLS; j++)
+    {
+      nocp->tile[i][j].txmem.data[0] = i << 0x10 | j;       // "i,j" tx test data ...
+      nocp->tile[i][j].ni.l = &(nocp->tile[i][j].router.l); // connect ni and router
+    }
+  }
 }
 
-void *
-corerun(void *coreid)
+void initrouter(NoC *nocp)
+{
+  // router links init
+  for (int i = 0; i < MESH_ROWS; i++)
+  {
+    for (int j = 0; j < MESH_COLS; j++) //...
+    {
+      nocp->tile[i][j].router.n.r = &(nocp->tile[i][j].router);
+      nocp->tile[i][j].router.e.r = &(nocp->tile[i][j].router);
+      nocp->tile[i][j].router.s.r = &(nocp->tile[i][j].router);
+      nocp->tile[i][j].router.w.r = &(nocp->tile[i][j].router);
+      nocp->tile[i][j].router.l.r = &(nocp->tile[i][j].router);
+      // torus property by connecting 'e' to 'w'
+      int m = (i + 1 < MESH_ROWS - 1) ? i + 1 : 0;
+      nocp->tile[i][j].router.e.al = &(nocp->tile[m][j].router.w);
+      // torus property by connecting 'n' to 's'
+      int n = (j + 1 < MESH_COLS - 1) ? j + 1 : 0;
+      nocp->tile[i][j].router.n.al = &(nocp->tile[i][n].router.s);
+    }
+  }
+}
+
+void *corerun(void *coreid)
 {
   long cid;
   cid = (long)coreid;
@@ -92,10 +125,34 @@ corerun(void *coreid)
   pthread_exit(NULL);
 }
 
+static NoC noc;
 int main(int argc, char *argv[])
 {
-  pthread_t threads[NUM_CORES];
-  for (long i = 0; i < NUM_CORES; i++)
+
+  initnoc(&noc);
+  initrouter(&noc);
+
+  for (int i = 0; i < MESH_ROWS; i++)
+  {
+    for (int j = 0; j < MESH_COLS; j++) //...
+    {
+      printf("router[%d][%d] rx data: 0x%08lx\n", i, j, noc.tile[i][j].txmem.data[0]);
+    }
+  }
+
+  //routing test
+  //e
+  noc.tile[0][0].router.e.al->r->regout = 2; // .tile[i][j].txmem[0]
+  printf("\nrouter[0][1].regout: 0x%08lx\n", noc.tile[0][0].router.regout);
+
+  //routing test
+  //nel
+  // nl
+  //  el
+  //...got this far 
+
+  pthread_t threads[CORES];
+  for (long i = 0; i < CORES; i++)
   {
     printf("Init nocsim: core %ld created ...\n", i);
     int returncode = pthread_create(&threads[i], NULL, corerun, (void *)i);
