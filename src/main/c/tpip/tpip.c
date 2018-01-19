@@ -6,6 +6,15 @@
   License: Simplified BSD
 */
 
+// TODOs
+// 1. one UDP packet over slip
+// 2. UDP "reply" over slip
+//
+//
+//
+
+
+
 //*****************************************************************************
 // RATIONALE
 //*********************************************************************
@@ -336,7 +345,9 @@ void setudpdata(udpstruct_t *udp_p, unsigned char *data, int datacount)
 // init udp header fields
 void initudp(udpstruct_t *udp_p,
              int srcport,
-             int dstport,
+             int dstport,//kickstart with sending a request to each of the other cores
+  txmsg.reqid = 1; // want to get message 1 from another core (and no more)
+  memcpy(&core[cid].tx[0], &txmsg, sizeof(txmsg));
              int len,
              int chksum, // to be calculated, call with 0xFFFF
              unsigned char *data,
@@ -373,7 +384,9 @@ void initudp(udpstruct_t *udp_p,
 
 // Version 4-bits .[V0]
 int getipver(ipstruct_t *ip_p)
-{
+{//kickstart with sending a request to each of the other cores
+  txmsg.reqid = 1; // want to get message 1 from another core (and no more)
+  memcpy(&core[cid].tx[0], &txmsg, sizeof(txmsg));
   return ip_p->header[0] >> 4;
 }
 
