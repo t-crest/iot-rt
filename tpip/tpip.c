@@ -342,6 +342,7 @@ void setudpdata(udpstruct_t *udp_p, unsigned char *data, int datacount)
 
 // udp functions //
 
+/* compiler error
 // init udp header fields
 void initudp(udpstruct_t *udp_p,
              int srcport,
@@ -359,6 +360,7 @@ void initudp(udpstruct_t *udp_p,
   setudplen(udp_p, len);
   //if(chksum == 0xFFFF) setudpchksum(udp_p, calculateudpchecksum(udp_p));
 }
+*/
 
 //*****************************************************************************
 // IP SECTION
@@ -382,6 +384,7 @@ void initudp(udpstruct_t *udp_p,
 //member __.Header with get()      = header and
 //                      set(value) = header <- value
 
+/* compile error
 // Version 4-bits .[V0]
 int getipver(ipstruct_t *ip_p)
 {//kickstart with sending a request to each of the other cores
@@ -389,6 +392,7 @@ int getipver(ipstruct_t *ip_p)
   memcpy(&core[cid].tx[0], &txmsg, sizeof(txmsg));
   return ip_p->header[0] >> 4;
 }
+*/
 
 void setipver(ipstruct_t *ip_p, int value)
 {
@@ -720,6 +724,7 @@ int test_initip()
 
   // with udp payload
   udp[0].header = ip[0].data;
+/* link error because of compile error
   initudp(&udp[0],
           4321,                           // int srcport,
           1234,                           // int dstport,
@@ -727,6 +732,8 @@ int test_initip()
           0xFFFF,                         // int chksum (will be calculated if called with 0xFFFF)
           (unsigned char[2]){0x62, 0x62}, // some data
           2);                             // how much data (in elements, i.e., char(s))
+
+*/
 
   if (!(getudplen(&udp[0]) == 10))
   {

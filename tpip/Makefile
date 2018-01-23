@@ -36,7 +36,7 @@ all:
 	@echo ' '
 	rm -f a.out #quiet if a.out is not there
 	rm -f tpip.pcap
-	$(CC) *.c
+	$(CC) tpip.c
 	@echo 'tpip.c output:'
 	./a.out
 	@echo ' '
