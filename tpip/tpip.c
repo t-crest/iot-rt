@@ -2,7 +2,7 @@
   tpIP, the time-predictable TCP/IP stack.
 
   Copyright: DTU, CBS
-  Authors: Martin Schoeberl, Rasmus Ulslev Pedersen
+  Authors: Martin Schoeberl (martin@jopdesign.com), Rasmus Ulslev Pedersen
   License: Simplified BSD
 */
 

@@ -44,3 +44,10 @@ all:
 	#it fails but is is ok
 	tcpdump -r tpip.pcap
 	#note: sudo tcpdump -nnvXSs 0 -c1 -i any
+
+slip:
+	$(CC) test_slip.c slip.c
+	./a.out
+
+clean:
+	rm -f a.out tpip.pcap tpip.pml

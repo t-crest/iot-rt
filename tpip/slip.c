@@ -1,11 +1,36 @@
 #include <stdio.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #define END 0xc0
 #define ESC 0xdb
 #define ESC_END 0xdc
 #define ESC_ESC 0xdd
 
+void tpip_slip_run() {
+  // peridic stuff
+  printf("hello\n");
+}
+
+int tpip_slip_rxfull() {
+  // 
+  return 0;
+}
+
+int tpip_slip_rxread(unsigned char buf[]) {
+  return 123;
+}
+
+int tpip_slip_txempty() {
+  return 0;
+}
+
+void tpip_slip_txwrite(unsigned char buf[], int len) {
+
+}
+
+// below is stuff that needs to be changed and other names.
+// Don't look at it now
 void tpip_print(unsigned char buf[], int len) {
   
   printf("One packet:\n");
@@ -48,8 +73,8 @@ void tpip_slip(char *dev) {
   }
 }
 
-
-int main(int argc, char *argv[]) {
+// should not be here
+int old_main(int argc, char *argv[]) {
 
   if (argc != 2) return -1;
   tpip_slip(argv[1]);
