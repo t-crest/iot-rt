@@ -1,12 +1,11 @@
-# iot-rt
-Real-Time HTTP/TCP/IP and UDP/IP Stack for IoT
+# Real-Time HTTP/TCP/IP and UDP/IP Stack for IoT
 
-The tipsi directory has a small simulator for testing out ideas on how to use the IP protocols for setting up messages with a specified max. delay.
+This project is on building time-predictable networked devices.
+As a starting point we look how to implement a time-predictable TCP/IP stack.
+First experiments have been done with Scala.
+Currently we focus on implementing the tpIP stack in C to be worst-case execution
+time (WCET) analyzable and to exeute on the Patmos/T-CREST platform.
 
-## First Experiments
+We plan to submit a first paper in this project to ISORC 2018.
 
-Send IP packets on top of TCP or HTTP post. Our packet is 2 bytes length plus data. For raw TCP we use port 99, for HTTP port 80. In the HTTP post request we encode the binary packet in ascii using hex digits. After each TCP send the TCP connection is closed.
-
-Proposal for Blaa Hund enhancement: If we allow underscores in the message then it can be easier to decode. So one could send something like "4500_0000" or "4500000" and both would be legal.
-
-We will use https://ngrok.com for tunneling.
+As a next step we will look into REST for IoT on top if the tpIP stack.
