@@ -27,13 +27,7 @@ wcet:
 	#platin wcet -i tpip.pml -b a.out -e calculateipchecksum --report
 
 all:
-	@echo ' '
-	@echo '*********************************************************'
-	@echo '*********************************************************'
 	@echo '**********************NEW BUILD**************************'
-	@echo '*********************************************************'
-	@echo '*********************************************************'
-	@echo ' '
 	rm -f a.out #quiet if a.out is not there
 	rm -f tpip.pcap
 	$(CC) tpip.c
@@ -47,6 +41,10 @@ all:
 
 slip:
 	$(CC) test_slip.c slip.c
+	./a.out
+
+obbtest: clean
+	$(CC) test_obb.c
 	./a.out
 
 clean:
