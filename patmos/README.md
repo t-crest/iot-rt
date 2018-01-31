@@ -4,12 +4,19 @@
 The second port is a USB/TTL cable connected to IO pins on the expansion header.
 It is connected to the expansion port at the bottom (see DE2 user manual on page 47).
 
-Connect a USB/TTL serial cable to those pins:
+To build a Patmos configuration with the second port us the project `altde2-all`.
+This is best setup by using a local `config.mk` file (in `t-crest/patmos`) as follows:
+
+```
+BOARD=altde2-all
+```
+
+Connect the USB/TTL serial cable to those pins:
 
 ```
 
 
-         3.3V  | * * |  GND
+               | * * |  GND
                | * * |
                | * * |
                | * * |
@@ -18,7 +25,7 @@ Connect a USB/TTL serial cable to those pins:
                +-----+
 ```
 
-RX and TX are from Patmos view. Connect TX from your device to RX of Patmos,
+RX and TX names are from Patmos view. Connect TX from your USB/TTL device to RX of Patmos,
 and RX to TX.
 
 Start a terminal (gktterm) on the USB port of the USB/TTL cable.
@@ -34,7 +41,8 @@ Then run the compilation of hello2.c and download it in *this* repository with:
 make all down
 ```
 
-You should see some greeting in the terminal window.
+You should see some greeting in the terminal window coming from the second
+serial port.
 
 
 
