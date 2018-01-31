@@ -7,6 +7,7 @@
 */
 
 // TODOs
+// 0. use a struct to work with the packet and not "raw" memory
 // 1. one UDP packet over slip
 // 2. UDP "reply" over slip
 //
