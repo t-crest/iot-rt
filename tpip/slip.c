@@ -51,9 +51,18 @@ void tpip_slip(char *dev) {
   unsigned char c;
   int is_esc = 0;
   int cnt = 0;
+
+/*
+  for (;;) {
+    if (read(fd, &c, 1) == 1) {
+      printf("%c", c);
+    }
+  }
+*/
+for(;;) {
   while(read(fd, &c, 1) == 1) {
     
-    // printf("%02x %d %d \n", c, is_esc, cnt);
+    printf("%02x %d %d \n", c, is_esc, cnt);
     if (is_esc) {
       if (c == ESC_ESC) {
         buf[cnt++] = ESC;
@@ -72,11 +81,4 @@ void tpip_slip(char *dev) {
     if (cnt == 2000) cnt = 0;
   }
 }
-
-// should not be here
-int old_main(int argc, char *argv[]) {
-
-  if (argc != 2) return -1;
-  tpip_slip(argv[1]);
-  return 0;
 }

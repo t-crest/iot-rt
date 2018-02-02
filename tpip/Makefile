@@ -41,7 +41,7 @@ all:
 
 slip:
 	$(CC) test_slip.c slip.c
-	./a.out
+	./a.out /dev/ttyUSB0
 
 obbtest: clean
 	$(CC) test_obb.c

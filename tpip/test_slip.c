@@ -3,7 +3,13 @@
 */
 #include "config.h"
 
-int main() {
+void tpip_slip(char *);
+
+int main(int argc, char *argv[]) {
+
+  if (argc != 2) return -1;
+  tpip_slip(argv[1]);
+  return 0;
 
   // this shall be called periodically
   LL_RUN();
