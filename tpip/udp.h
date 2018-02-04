@@ -7,12 +7,17 @@
 //   unsigned char *data;   // this is the udp data
 // } udpstruct_t;
 
-typedef struct udp_datagram
+#ifndef UDP_H
+#define UDP_H
+
+struct udp_msg
 {
     short srcport;
     short dstport;
     // bytes
-    short length; // update this each time data is changed
+    short length; // update this (and IP total length) each time data is changed
     short checksum;
     char *data;
-} udp_datagram;
+};
+
+#endif // UDP_H
