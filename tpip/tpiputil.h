@@ -3,6 +3,8 @@
 #ifndef TPIPUTIL_H
 #define TPIPUTIL_H
 
+#include <time.h> // CLOCKS_PER_SEC
+
 // period length (ms). Can also be cycles if on 'bare metal'
 #define PERIOD 100 // 1000 // must be less than 2,147,483,647
 

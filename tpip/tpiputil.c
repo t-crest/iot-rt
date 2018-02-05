@@ -19,7 +19,7 @@ __attribute__((noinline)) int currenttimemillis()
 
   clock_t start_t;
   start_t = clock();
-  int mstime = ((unsigned int)start_t / (unsigned int)CLOCKS_PER_MSEC);
+  int mstime = ((unsigned int)start_t / (unsigned int) CLOCKS_PER_MSEC);
 
   //volatile long long int msec = 0;
   //msec = timenow.tv_sec;
