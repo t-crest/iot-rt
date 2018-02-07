@@ -2,10 +2,31 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include "config.h"
+
 #define END 0xc0
 #define ESC 0xdb
 #define ESC_END 0xdc
 #define ESC_ESC 0xdd
+
+#define MAX 2000
+
+static int fd;
+
+unsigned char buf[MAX];
+int is_esc = 0;
+int cnt = 0;
+
+
+
+int tpip_slip_init(char *str) {
+
+  fd = open(str, O_RDONLY);
+  // O_NDELAY returns 0 when no character available, maybe useful for the real polling thing
+  printf("SLIP open: %s %d\n", str, fd);
+
+  return 0;
+}
 
 void tpip_slip_run() {
   // peridic stuff
@@ -41,16 +62,12 @@ void tpip_print(unsigned char buf[], int len) {
   printf("\n\n");
 }
 
+
 void tpip_slip(char *dev) {
 
-  int fd = open(dev, O_RDONLY);
-  // O_NDELAY returns 0 when no character available, maybe useful for the real polling thing
-  printf("%s %d\n", dev, fd);
-
-  unsigned char buf[2000];
   unsigned char c;
-  int is_esc = 0;
-  int cnt = 0;
+
+  LL_INIT(dev);
 
 /*
   for (;;) {
@@ -62,7 +79,6 @@ void tpip_slip(char *dev) {
 for(;;) {
   while(read(fd, &c, 1) == 1) {
     
-    printf("%02x %d %d \n", c, is_esc, cnt);
     if (is_esc) {
       if (c == ESC_ESC) {
         buf[cnt++] = ESC;

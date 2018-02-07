@@ -14,6 +14,7 @@
 
 
 // macros for the interface
+#define LL_INIT(x) CONCAT(tpip_, LINKLAYER, _init)(x)
 #define LL_RUN CONCAT(tpip_, LINKLAYER, _run)
 #define LL_RXFULL CONCAT(tpip_, LINKLAYER, _rxfull)
 #define LL_RXREAD(x) CONCAT(tpip_, LINKLAYER, _rxread)(x)
@@ -21,6 +22,7 @@
 #define LL_TXWRITE(x, y) CONCAT(tpip_, LINKLAYER, _txwrite)(x, y)
 
 // declare all functions here
+int LL_INIT(char *str);
 void LL_RUN();
 int LL_RXFULL();
 int LL_RXREAD(unsigned char buf[]);
