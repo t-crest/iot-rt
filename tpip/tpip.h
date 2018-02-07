@@ -83,7 +83,7 @@ void printip(unsigned long ip);
 #include <arpa/inet.h>
 #else
 //not implemented on patmos
-inline unsigned int htonl(unsigned int val) { printf("***\n"); return val; }
+inline unsigned int htonl(unsigned int val) { return val; }
 inline unsigned short htons(unsigned short val) { return val; }
 inline unsigned int ntohl(unsigned int val) { return val; }
 inline unsigned short ntohs(unsigned short val) { return val; }

@@ -19,7 +19,7 @@ void printip(unsigned long ip)
   printf("%d.%d.%d.%d\n", (int)((ip >> 24) & 0xFF), (int)((ip >> 16) & 0xFF), (int)((ip >> 8) & 0xFF), (int)(ip & 0xFF));
 }
 
-int packip(unsigned long networkbuf[], const ip_t *ip)
+__attribute__((noinline)) int packip(unsigned long networkbuf[], const ip_t *ip)
 {
   networkbuf[1] = htonl((ip->verhdl << 24) | (ip->tos << 16) | htons(ip->length));
   networkbuf[2] = htonl((htons(ip->id) << 16) | htons(ip->ff));
@@ -31,11 +31,12 @@ int packip(unsigned long networkbuf[], const ip_t *ip)
 
   int udpdatawords = (ip->udp.length / 4) - 2;
 
+  _Pragma("loopbound min 0 max 8")
   for (int i = 0; i < udpdatawords; i++)
-    networkbuf[8 + i] = htonl(ip->udp.data[i * 4] << 24 |
-                              ip->udp.data[i * 4 + 1] << 16 |
-                              ip->udp.data[i * 4 + 2] << 8 |
-                              ip->udp.data[i * 4 + 3]);
+     networkbuf[8 + i] = htonl(ip->udp.data[i * 4] << 24 |
+                               ip->udp.data[i * 4 + 1] << 16 |
+                               ip->udp.data[i * 4 + 2] << 8 |
+                               ip->udp.data[i * 4 + 3]);
 
   networkbuf[0] = htonl(1 + 5 + 2 + udpdatawords);
   return networkbuf[0];

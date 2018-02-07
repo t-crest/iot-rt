@@ -21,13 +21,14 @@ pcap:
 	#tcpdump -nnvXSs 0 -c1 -i any
 
 wcet:
-	#patmos-clang -O2 -mserialize=tpip.pml tpip.c
+	patmos-clang -O2 -mserialize=tpip.pml test_obb.c tpip.c
 #patmos-clang -O0 -mserialize=tpip.pml tpip.c
 #the function to be analyzed in listed just before --report
 #functions: checksum waitfornextperiod wait
 #platin wcet -i tpip.pml -b a.out -e getipdstip  --report
 #platin wcet -i tpip.pml -b a.out -e wait --report
-	#platin wcet -i tpip.pml -b a.out -e waitfornextperiod
+	platin wcet -i tpip.pml -b a.out -e packip
+	platin wcet -i tpip.pml -b a.out -e xmit
 	#platin visualize -i tpip.pml -f waitfornextperiod
 #platin wcet -i tpip.pml -b a.out -e currenttimemillis --report
 #platin wcet -i tpip.pml -b a.out -e calculateipchecksum --report

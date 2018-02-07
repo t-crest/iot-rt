@@ -24,10 +24,25 @@ void printword(unsigned int val)
 
 unsigned long bufout[BUFSIZEWORDS];
 
-int main(int argc, char *argv[])
+__attribute__((noinline)) void xmit(char *pbuf, int len)
 {
     volatile _IODEV int *uart2_ptr = (volatile _IODEV int *)0xF00e0004;
     volatile _IODEV int *uart2_status_ptr = (volatile _IODEV int *)0xF00e0000;
+
+    //BUFSIZEWORDS
+    _Pragma("loopbound min 0 max 512") for (int i = 0; i < len * 4; ++i)
+    {
+        // verify worst wait here...
+        _Pragma("loopbound min 0 max 1000")
+        while (((*(uart2_status_ptr)) & 0x01) == 0)
+            ; // busy wait
+        *uart2_ptr = *(pbuf + i);
+        //printf(" 0x%02x", *(pbuf + i));
+    }
+}
+
+int main(int argc, char *argv[])
+{
 
     memset(bufout, 0, sizeof(bufout));
 
@@ -54,20 +69,13 @@ int main(int argc, char *argv[])
     //char hello[] = "Hello Second World\r\n";
     int len = packip(bufout, &ipout);
 
-    for(int i = 0; i < 8; i++)
-      printword(bufout[i]);
+    for (int i = 0; i < 8; i++)
+        printword(bufout[i]);
 
     char *pbuf = (char *)bufout;
 
     printf("patmos sending: \n");
-    //for (int i = 0; hello[i] != 0; ++i)
-    for (int i = 0; i < len * 4; ++i)
-    {
-        while (((*(uart2_status_ptr)) & 0x01) == 0)
-            ; // busy wait
-        *uart2_ptr = *(pbuf + i);
-        printf(" 0x%02x", *(pbuf + i));
-    }
+    xmit(pbuf, len);
     printf("\n");
     printf("obb flag test completed on patmos...\n");
 
