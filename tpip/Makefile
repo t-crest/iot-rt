@@ -1,20 +1,19 @@
 CC=gcc
 # CC=clang
 
+SERIAL?=/dev/ttyUSB0
+
 help:
 	# Make file for tpip
-	#   tpip: compile and run tpip on host alone
 	#   pcap: tcpdump stuff
     #   wcet: wcet of one function and some png call graphs
 	#   macrocheck: see how macros are tested
 	#   slip: (ms: will you write what it does?)
-	#   obbtest: testing of obb case
+	#   tpiphost: host listener (UDP on serial 2)
+	#   tpippatmos: patmos will send UDP over serial 2
 	#   clean: removing files
 
-tpip:
-	@echo '**********************NEW BUILD**************************'
-	$(CC) tpip.c test_tpip.c
-	./a.out
+
 
 pcap:
 	@echo 'tcpdump output:'
@@ -41,9 +40,15 @@ slip:
 	$(CC) test_slip.c slip.c
 	./a.out /dev/ttyUSB0
 
-obbtest: clean
-	$(CC) test_obb.c
+tpiphost:
+    #start listening on host
+	$(CC) tpip.c test_tpip.c
 	./a.out
 
+tpippatmos:
+	#start on patmos (a second terminal)
+	patmos-clang -O2 test_obb.c tpip.c -o test_obb.elf
+	patserdow -v /dev/ttyUSB0 test_obb.elf
+
 clean:
-	rm -f *.out *.pcap *.pml *.png
+	rm -f *.out *.pcap *.pml *.png *.elf

@@ -12,7 +12,6 @@
 // 2. UDP "reply" over slip
 
 #include <stdio.h>
-#include <arpa/inet.h>
 #include "tpip.h"
 
 void printip(unsigned long ip)
@@ -20,7 +19,7 @@ void printip(unsigned long ip)
   printf("%d.%d.%d.%d\n", (int)((ip >> 24) & 0xFF), (int)((ip >> 16) & 0xFF), (int)((ip >> 8) & 0xFF), (int)(ip & 0xFF));
 }
 
-void packip(unsigned long networkbuf[], const ip_t *ip)
+int packip(unsigned long networkbuf[], const ip_t *ip)
 {
   networkbuf[1] = htonl((ip->verhdl << 24) | (ip->tos << 16) | htons(ip->length));
   networkbuf[2] = htonl((htons(ip->id) << 16) | htons(ip->ff));
@@ -38,12 +37,13 @@ void packip(unsigned long networkbuf[], const ip_t *ip)
                               ip->udp.data[i * 4 + 2] << 8 |
                               ip->udp.data[i * 4 + 3]);
 
-  networkbuf[0] = htonl(5 + 2 + udpdatawords);
+  networkbuf[0] = htonl(1 + 5 + 2 + udpdatawords);
+  return networkbuf[0];
 }
 
-void unpackip(ip_t *ip, const unsigned long networkbuf[])
+void unpackip(ip_t *ip, const unsigned int networkbuf[])
 {
-  unsigned long word = ntohl(networkbuf[1]);
+  unsigned int word = ntohl(networkbuf[1]);
   ip->verhdl = (unsigned char)(word >> 24);
   ip->tos = (unsigned char)((word >> 16) & 0xFF);
   ip->length = ntohs(word & 0xFFFF);
@@ -76,8 +76,8 @@ void unpackip(ip_t *ip, const unsigned long networkbuf[])
   }
 
   // check
-  if ((udpdatawords + 5 + 2) != ntohl(networkbuf[0]))
-    printf("error: networkbuf[0]=%lu\n", (unsigned long)ntohl(networkbuf[0]));
+  //if ((1 + 5 + 2 + udpdatawords) != ntohl(networkbuf[0]))
+    //printf("error: networkbuf[0]=0x%08x\n", (unsigned int)ntohl(networkbuf[0]));
 }
 
 // OLD STUFF: can be deleted

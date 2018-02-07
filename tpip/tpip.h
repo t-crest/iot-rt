@@ -69,15 +69,25 @@ typedef struct ip_t
 } ip_t;
 
 // loads a network buffer with an ip packet
-// first word is how many words in use 
-void packip(unsigned long networkbuf[], const ip_t *ip);
+// first word is how many words in use
+int packip(unsigned long networkbuf[], const ip_t *ip);
 
 // unloads an ip packet from a network buffer
-// first word is how many words in use 
-void unpackip(ip_t *ip, const unsigned long networkbuf[]);
+// first word is how many words in use
+void unpackip(ip_t *ip, const unsigned int networkbuf[]);
 
-// print ip address 
+// print ip address
 void printip(unsigned long ip);
+
+#ifndef __patmos__
+#include <arpa/inet.h>
+#else
+//not implemented on patmos
+inline unsigned int htonl(unsigned int val) { printf("***\n"); return val; }
+inline unsigned short htons(unsigned short val) { return val; }
+inline unsigned int ntohl(unsigned int val) { return val; }
+inline unsigned short ntohs(unsigned short val) { return val; }
+#endif
 
 #endif // TPIP_H
 

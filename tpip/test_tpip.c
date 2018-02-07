@@ -1,8 +1,135 @@
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
 #include "tpip.h"
+#include <termios.h>
+#include <unistd.h>
+
+//termious copy start
+
+// setup
+//unsigned long bufout[BUFSIZEWORDS];
+unsigned long netbufin[BUFSIZEWORDS];
+
+int set_interface_attribs(int fd, int speed)
+{
+    struct termios tty;
+
+    if (tcgetattr(fd, &tty) < 0)
+    {
+        printf("Error from tcgetattr: %s\n", strerror(errno));
+        return -1;
+    }
+
+    cfsetospeed(&tty, (speed_t)speed);
+    cfsetispeed(&tty, (speed_t)speed);
+
+    tty.c_cflag |= (CLOCAL | CREAD); /* ignore modem controls */
+    tty.c_cflag &= ~CSIZE;
+    tty.c_cflag |= CS8;      /* 8-bit characters */
+    tty.c_cflag &= ~PARENB;  /* no parity bit */
+    tty.c_cflag &= ~CSTOPB;  /* only need 1 stop bit */
+    tty.c_cflag &= ~CRTSCTS; /* no hardware flowcontrol */
+
+    /* setup for non-canonical mode */
+    tty.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
+    tty.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
+    tty.c_oflag &= ~OPOST;
+
+    /* fetch bytes as they become available */
+    tty.c_cc[VMIN] = 1;
+    tty.c_cc[VTIME] = 1;
+
+    if (tcsetattr(fd, TCSANOW, &tty) != 0)
+    {
+        printf("Error from tcsetattr: %s\n", strerror(errno));
+        return -1;
+    }
+    return 0;
+}
+
+void set_mincount(int fd, int mcount)
+{
+    struct termios tty;
+
+    if (tcgetattr(fd, &tty) < 0)
+    {
+        printf("Error tcgetattr: %s\n", strerror(errno));
+        return;
+    }
+
+    tty.c_cc[VMIN] = mcount ? 1 : 0;
+    tty.c_cc[VTIME] = 5; /* half second timer */
+
+    if (tcsetattr(fd, TCSANOW, &tty) < 0)
+        printf("Error tcsetattr: %s\n", strerror(errno));
+}
+
+void printword(unsigned int val)
+{
+    unsigned int hostorder = ntohl(val);
+    printf("0x%02x 0x%02x 0x%02x 0x%02x -> 0x%02x 0x%02x 0x%02x 0x%02x\n", ((val >> 24) & 0xFF), ((val >> 16) & 0xFF), ((val >> 8) & 0xFF), (val & 0xFF),
+           ((hostorder >> 24) & 0xFF), ((hostorder >> 16) & 0xFF), ((hostorder >> 8) & 0xFF), (hostorder & 0xFF));
+}
+
+int listentoserial(unsigned char *bufin)
+{
+    char *portname = "/dev/ttyUSB1";
+    int fd;
+    int wlen;
+
+    fd = open(portname, O_RDWR | O_NOCTTY | O_SYNC);
+    if (fd < 0)
+    {
+        printf("Error opening %s: %s\n", portname, strerror(errno));
+        return -1;
+    }
+    /*baudrate 115200, 8 bits, no parity, 1 stop bit */
+    set_interface_attribs(fd, B115200);
+    //set_mincount(fd, 0);                /* set to pure timed read */
+
+    /* simple output */
+    // wlen = write(fd, "Hello!\n", 7);
+    // if (wlen != 7)
+    // {
+    //     printf("Error from write: %d, %d\n", wlen, errno);
+    // }
+    // tcdrain(fd); /* delay for output */
+
+    int rdlenall = 0;
+    unsigned long words_to_get;
+
+    /* simple noncanonical input */
+    do
+    {
+        int rdlen;
+        unsigned char buf[1000];
+        rdlen = read(fd, buf, sizeof(buf) - 1);
+        rdlenall += rdlen;
+        if (rdlen > 0)
+        {
+            unsigned char *p;
+            printf("Read %d bytes from serial\n", rdlen);
+            for (p = buf; rdlen-- > 0; p++)
+            {
+                //printf(" 0x%02x ", *p);
+                *bufin = *p;
+                bufin++;
+            }
+            //printf("\n");
+            // look at first word for length
+        }
+        else if (rdlen < 0)
+        {
+            printf("Error from read: %d: %s\n", rdlen, strerror(errno));
+        }
+        /* repeat read to get full message */
+    } while (rdlenall <= 31); //while (1);
+}
+//termious copy end
 
 // this function is just to pretend that we have a network
 // it will (eventually) be used with patmos serial port 2 and the
@@ -12,42 +139,30 @@ void networkmagic(unsigned long bufrx[], const unsigned long buftx[])
     memcpy(bufrx, buftx, BUFSIZEWORDS * 4);
 }
 
-// show how to send an ip packet over a network, 
+// show how to send an ip packet over a network,
 // receive it, and look in the UDP data
 int main()
 {
-    // setup
-    unsigned long bufout[BUFSIZEWORDS];
-    unsigned long bufin[BUFSIZEWORDS];
+    //memset(netbufin, 0, BUFSIZEWORDS * 4);
+    unsigned char mybuffer[8000];
+    listentoserial(mybuffer);
+    printf("\n");
+    for (int i = 0; i < 32; i++)
+    {
+        //printf("mybuffer[%d]:0x%02x \n", i, mybuffer[i]);
+    }
 
-    // prepare to "send"
-    // patmos, 10.0.0.2, 10002
-    ip_t ipout = {.verhdl = 0x4 | 0x5,
-                  .tos = 0x00,
-                  .length = 20 + 8 + 4, // 5 + 2 + 1 words
-                  .id = 1,
-                  .ff = 0x4000,
-                  .ttl = 0x20,
-                  .prot = 0x11, // UDP
-                  .checksum = 0x0000,
-                  .srcip = (10 << 24) | (0 << 16) | (0 << 8) | 2,
-                  .dstip = (10 << 24) | (0 << 16) | (0 << 8) | 3,
-                  .udp.srcport = 10002, // 0x2712
-                  .udp.dstport = 10003, // 0x2713
-                  .udp.length = 8 + 4,
-                  .udp.data = (char[]){1, 2, 3, 4}};
+    unsigned int *ulp = (unsigned int *)mybuffer;
+    //printf("*ulp=0x%08x\n", *ulp);
+    //printf("*ulp+1=0x%08x\n", *(ulp+1));
 
-    packip(bufout, &ipout);
-
-    // "send"
-    networkmagic(bufin, bufout);
-
-    // "receive"
-    // create an ip packet to be used
+    // receive
+    // empty ip packet
     ip_t *ipin = malloc(sizeof(ip_t));
-    ipin->udp.data = (char[]){0,0,0,0};
-    unpackip(ipin, bufin);
-    
+    ipin->udp.data = (char[]){0, 0, 0, 0};
+    //unpackip(ipin, netbufin);
+    unpackip(ipin, (unsigned int *)mybuffer);
+
     // see what we got: 1, 2, 3, 4
     printf("udp data[0] received %d\n", ipin->udp.data[0]);
     printf("udp data[1] received %d\n", ipin->udp.data[1]);
@@ -55,6 +170,7 @@ int main()
     printf("udp data[3] received %d\n", ipin->udp.data[3]);
     // and from whom
     printip(ipin->srcip);
+    printf("\nobb flag test completed on host...\n");
 
     return 0;
 }
