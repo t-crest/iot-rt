@@ -19,7 +19,11 @@ int main()
 {
     //memset(netbufin, 0, BUFSIZEWORDS * 4);
     unsigned char mybuffer[8000];
+    // comment this out if listentoserialslip is enabled
     listentoserial(mybuffer);
+    // this is the entry point for enabling slip receiving
+    listentoserialslip(mybuffer);
+
     printf("\n");
     for (int i = 0; i < 32; i++)
     {

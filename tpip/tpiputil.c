@@ -1,6 +1,5 @@
 // tpiputil.c
 
-
 //#include <arpa/inet.h>
 #include "tpiputil.h"
 
@@ -86,7 +85,7 @@ __attribute__((noinline)) int currenttimemillis()
 
   clock_t start_t;
   start_t = clock();
-  int mstime = ((unsigned int)start_t / (unsigned int) CLOCKS_PER_MSEC);
+  int mstime = ((unsigned int)start_t / (unsigned int)CLOCKS_PER_MSEC);
 
   //volatile long long int msec = 0;
   //msec = timenow.tv_sec;
@@ -148,117 +147,129 @@ int deadline()
 // setup
 int set_interface_attribs(int fd, int speed)
 {
-    struct termios tty;
+  struct termios tty;
 
-    if (tcgetattr(fd, &tty) < 0)
-    {
-        printf("Error from tcgetattr: %s\n", strerror(errno));
-        return -1;
-    }
+  if (tcgetattr(fd, &tty) < 0)
+  {
+    printf("Error from tcgetattr: %s\n", strerror(errno));
+    return -1;
+  }
 
-    cfsetospeed(&tty, (speed_t)speed);
-    cfsetispeed(&tty, (speed_t)speed);
+  cfsetospeed(&tty, (speed_t)speed);
+  cfsetispeed(&tty, (speed_t)speed);
 
-    tty.c_cflag |= (CLOCAL | CREAD); /* ignore modem controls */
-    tty.c_cflag &= ~CSIZE;
-    tty.c_cflag |= CS8;      /* 8-bit characters */
-    tty.c_cflag &= ~PARENB;  /* no parity bit */
-    tty.c_cflag &= ~CSTOPB;  /* only need 1 stop bit */
-    tty.c_cflag &= ~CRTSCTS; /* no hardware flowcontrol */
+  tty.c_cflag |= (CLOCAL | CREAD); /* ignore modem controls */
+  tty.c_cflag &= ~CSIZE;
+  tty.c_cflag |= CS8;      /* 8-bit characters */
+  tty.c_cflag &= ~PARENB;  /* no parity bit */
+  tty.c_cflag &= ~CSTOPB;  /* only need 1 stop bit */
+  tty.c_cflag &= ~CRTSCTS; /* no hardware flowcontrol */
 
-    /* setup for non-canonical mode */
-    tty.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
-    tty.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
-    tty.c_oflag &= ~OPOST;
+  /* setup for non-canonical mode */
+  tty.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
+  tty.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
+  tty.c_oflag &= ~OPOST;
 
-    /* fetch bytes as they become available */
-    tty.c_cc[VMIN] = 1;
-    tty.c_cc[VTIME] = 1;
+  /* fetch bytes as they become available */
+  tty.c_cc[VMIN] = 1;
+  tty.c_cc[VTIME] = 1;
 
-    if (tcsetattr(fd, TCSANOW, &tty) != 0)
-    {
-        printf("Error from tcsetattr: %s\n", strerror(errno));
-        return -1;
-    }
-    return 0;
+  if (tcsetattr(fd, TCSANOW, &tty) != 0)
+  {
+    printf("Error from tcsetattr: %s\n", strerror(errno));
+    return -1;
+  }
+  return 0;
 }
 
 void set_mincount(int fd, int mcount)
 {
-    struct termios tty;
+  struct termios tty;
 
-    if (tcgetattr(fd, &tty) < 0)
-    {
-        printf("Error tcgetattr: %s\n", strerror(errno));
-        return;
-    }
+  if (tcgetattr(fd, &tty) < 0)
+  {
+    printf("Error tcgetattr: %s\n", strerror(errno));
+    return;
+  }
 
-    tty.c_cc[VMIN] = mcount ? 1 : 0;
-    tty.c_cc[VTIME] = 5; /* half second timer */
+  tty.c_cc[VMIN] = mcount ? 1 : 0;
+  tty.c_cc[VTIME] = 5; /* half second timer */
 
-    if (tcsetattr(fd, TCSANOW, &tty) < 0)
-        printf("Error tcsetattr: %s\n", strerror(errno));
+  if (tcsetattr(fd, TCSANOW, &tty) < 0)
+    printf("Error tcsetattr: %s\n", strerror(errno));
 }
 
 void printword(unsigned int val)
 {
-    unsigned int hostorder = ntohl(val);
-    printf("0x%02x 0x%02x 0x%02x 0x%02x -> 0x%02x 0x%02x 0x%02x 0x%02x\n", ((val >> 24) & 0xFF), ((val >> 16) & 0xFF), ((val >> 8) & 0xFF), (val & 0xFF),
-           ((hostorder >> 24) & 0xFF), ((hostorder >> 16) & 0xFF), ((hostorder >> 8) & 0xFF), (hostorder & 0xFF));
+  unsigned int hostorder = ntohl(val);
+  printf("0x%02x 0x%02x 0x%02x 0x%02x -> 0x%02x 0x%02x 0x%02x 0x%02x\n", ((val >> 24) & 0xFF), ((val >> 16) & 0xFF), ((val >> 8) & 0xFF), (val & 0xFF),
+         ((hostorder >> 24) & 0xFF), ((hostorder >> 16) & 0xFF), ((hostorder >> 8) & 0xFF), (hostorder & 0xFF));
 }
 
+// the IP/UDP packet is encloded in SLIP and does not have
+// and extra header word with the length
+
+int listentoserialslip(unsigned char *bufin)
+{
+  printf("listentoserialslip: not implemented yet");
+  return -1;
+};
+
+// the IP/UDP packet has a header word with the length (in words)
 int listentoserial(unsigned char *bufin)
 {
-    char *portname = "/dev/ttyUSB1";
-    int fd;
-    int wlen;
+  char *portname = "/dev/ttyUSB1";
+  int fd;
+  int wlen;
 
-    fd = open(portname, O_RDWR | O_NOCTTY | O_SYNC);
-    if (fd < 0)
+  fd = open(portname, O_RDWR | O_NOCTTY | O_SYNC);
+  if (fd < 0)
+  {
+    printf("Error opening %s: %s\n", portname, strerror(errno));
+    return -1;
+  }
+  /*baudrate 115200, 8 bits, no parity, 1 stop bit */
+  set_interface_attribs(fd, B115200);
+  //set_mincount(fd, 0);                /* set to pure timed read */
+
+  /* simple output */
+  // wlen = write(fd, "Hello!\n", 7);
+  // if (wlen != 7)
+  // {
+  //     printf("Error from write: %d, %d\n", wlen, errno);
+  // }
+  // tcdrain(fd); /* delay for output */
+
+  int rdlenall = 0;
+  unsigned long words_to_get;
+
+  /* simple noncanonical input */
+  do
+  {
+    int rdlen;
+    unsigned char buf[1000];
+    rdlen = read(fd, buf, sizeof(buf) - 1);
+    rdlenall += rdlen;
+    if (rdlen > 0)
     {
-        printf("Error opening %s: %s\n", portname, strerror(errno));
-        return -1;
+      unsigned char *p;
+      printf("Read %d bytes from serial\n", rdlen);
+      for (p = buf; rdlen-- > 0; p++)
+      {
+        //printf(" 0x%02x ", *p);
+        *bufin = *p;
+        bufin++;
+      }
+      //printf("\n");
+      // look at first word for length
     }
-    /*baudrate 115200, 8 bits, no parity, 1 stop bit */
-    set_interface_attribs(fd, B115200);
-    //set_mincount(fd, 0);                /* set to pure timed read */
-
-    /* simple output */
-    // wlen = write(fd, "Hello!\n", 7);
-    // if (wlen != 7)
-    // {
-    //     printf("Error from write: %d, %d\n", wlen, errno);
-    // }
-    // tcdrain(fd); /* delay for output */
-
-    int rdlenall = 0;
-    unsigned long words_to_get;
-
-    /* simple noncanonical input */
-    do
+    else if (rdlen < 0)
     {
-        int rdlen;
-        unsigned char buf[1000];
-        rdlen = read(fd, buf, sizeof(buf) - 1);
-        rdlenall += rdlen;
-        if (rdlen > 0)
-        {
-            unsigned char *p;
-            printf("Read %d bytes from serial\n", rdlen);
-            for (p = buf; rdlen-- > 0; p++)
-            {
-                //printf(" 0x%02x ", *p);
-                *bufin = *p;
-                bufin++;
-            }
-            //printf("\n");
-            // look at first word for length
-        }
-        else if (rdlen < 0)
-        {
-            printf("Error from read: %d: %s\n", rdlen, strerror(errno));
-        }
-        /* repeat read to get full message */
-    } while (rdlenall <= 31); //while (1);
+      printf("Error from read: %d: %s\n", rdlen, strerror(errno));
+    }
+    /* repeat read to get full message */
+  } while (rdlenall <= 31); //while (1);
+
+  return rdlenall / 4;
 }
 //termious copy end

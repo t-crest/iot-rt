@@ -24,24 +24,6 @@ void printword(unsigned int val)
 
 static unsigned long bufout[BUFSIZEWORDS];
 
-// this function should be changed to slip
-__attribute__((noinline)) void xmitslip(char *pbuf, int len)
-{
-    volatile _IODEV int *uart2_ptr = (volatile _IODEV int *)0xF00e0004;
-    volatile _IODEV int *uart2_status_ptr = (volatile _IODEV int *)0xF00e0000;
-
-    //BUFSIZEWORDS
-    _Pragma("loopbound min 0 max 512") for (int i = 0; i < len * 4; ++i)
-    {
-        // verify worst wait here...
-        _Pragma("loopbound min 0 max 1000")
-        while (((*(uart2_status_ptr)) & 0x01) == 0)
-            ; // busy wait
-        *uart2_ptr = *(pbuf + i);
-        //printf(" 0x%02x", *(pbuf + i));
-    }
-}
-
 __attribute__((noinline)) void xmit(char *pbuf, int len)
 {
     volatile _IODEV int *uart2_ptr = (volatile _IODEV int *)0xF00e0004;
@@ -51,12 +33,18 @@ __attribute__((noinline)) void xmit(char *pbuf, int len)
     _Pragma("loopbound min 0 max 512") for (int i = 0; i < len * 4; ++i)
     {
         // verify worst wait here...
-        _Pragma("loopbound min 0 max 1000")
-        while (((*(uart2_status_ptr)) & 0x01) == 0)
-            ; // busy wait
+        _Pragma("loopbound min 0 max 1000") while (((*(uart2_status_ptr)) & 0x01) == 0); // busy wait
         *uart2_ptr = *(pbuf + i);
         //printf(" 0x%02x", *(pbuf + i));
     }
+}
+
+// this function should be changed to slip
+// modify this to encode and send over slip
+__attribute__((noinline)) void xmitslip(char *pbuf, int cnt)
+{
+    // cnt is the number of bytes to transmit
+    printf("xmitslip: not implemented yet");
 }
 
 int main(int argc, char *argv[])
@@ -90,11 +78,10 @@ int main(int argc, char *argv[])
     for (int i = 0; i < 8; i++)
         printword(bufout[i]);
 
-    char *pbuf = (char *)bufout;
-
     printf("patmos sending: \n");
-    xmit(pbuf, len);
-    xmitslip(pbuf, len);
+    xmit((char *)bufout, len);
+    // function for slip
+    xmitslip((char *)(&bufout[1]), (len - 1) * 4);
     printf("\n");
     printf("obb flag test completed on patmos...\n");
 

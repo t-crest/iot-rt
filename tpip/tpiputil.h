@@ -21,5 +21,7 @@
 
 // call this when wanting to read from the serial port on the PC
 int listentoserial(unsigned char *bufin);
+int listentoserialslip(unsigned char *bufin);
+
 
 #endif //TPIPUTIL_H
