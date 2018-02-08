@@ -89,7 +89,7 @@ typedef struct ip_t_ms {
   unsigned long prot;
   unsigned long source;
   unsigned long destination;
-} ip_t;
+} ip_t_; // there was a name collistion with the other ip_t above
 
 // as an example to get the version:
 // ntohl(ipbuf.length) >> 28
