@@ -68,6 +68,32 @@ typedef struct ip_t
   udp_t udp;               // default ip data paylod: udp message
 } ip_t;
 
+
+// proposal for using types (MS)
+// we cannot safely use shorter fields due to
+// possible different byte orders.
+// And copy stuff around is not so efficient.
+// Those fields referencing 32-bit words and include
+// all subfields. E.g., length word includes all the
+// subfields:
+//  |Version|  IHL  |Type of Service|          Total Length         |
+
+// It is "just" a naming instead of accessing a buff[0].
+
+
+typedef struct ip_t_ms {
+  unsigned long length;
+  //  |Version|  IHL  |Type of Service|          Total Length         |
+  unsigned long id;
+//  |         Identification        |Flags|      Fragment Offset    |
+  unsigned long prot;
+  unsigned long source;
+  unsigned long destination;
+} ip_t;
+
+// as an example to get the version:
+// ntohl(ipbuf.length) >> 28
+
 // loads a network buffer with an ip packet
 // first word is how many words in use
 int packip(unsigned long networkbuf[], const ip_t *ip);
