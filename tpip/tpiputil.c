@@ -3,7 +3,73 @@
 //#include <arpa/inet.h>
 #include "tpiputil.h"
 
-// not sure if we need a separate file for this
+// // CHECKSUM UTILITIES (on the original structs, so that is to be updated)
+
+//typedef struct udpstruct_t udpstruct_t;
+typedef struct ipstruct_t ipstruct_t;
+typedef struct udpstruct_t
+{
+  ipstruct_t *ipstructp;
+  unsigned char *header; // also the ip "data"
+  unsigned char *data;   // this is the udp data
+} udpstruct_t;
+
+typedef struct ipstruct_t
+{
+  unsigned char *header;
+  unsigned char *data; // this is the udp header
+} ipstruct_t;
+
+// 16-bit (pairs of two byte array entries)
+int datasum(char data[], int arraysize)
+{
+  //printf("arraysize=%d\n", arraysize);
+  for (int i = 0; i < arraysize; i = i + 1)
+  {
+    //printf("...data[%d]=0x%X\n", i, data[i]);
+  }
+  int datachecksum = 0;
+  if (arraysize == 0)
+  {
+    // nothing to do
+  }
+  else if (arraysize == 1)
+  {
+    datachecksum = ((int)data[0] << 8); // Pad with a "zero"
+  }
+  else
+  {
+    for (int i = 0; i < arraysize - 1; i = i + 2)
+    { // byte "pairs"
+      datachecksum = datachecksum + (((int)data[i] << 8) | ((int)data[i + 1]));
+      //printf("datachecksum=0x%X\n", datachecksum);
+    }
+    if (arraysize % 2 != 0) // one byte left
+      datachecksum = datachecksum + ((int)data[arraysize - 1] << 8);
+  }
+
+  return datachecksum;
+}
+
+// ip header checksum calculation
+int calculateipchecksum(ipstruct_t *ip_p) __attribute__((noinline));
+int calculateipchecksum(ipstruct_t *ip_p)
+{
+  unsigned char *h = ip_p->header;
+  int checksum = ((h[0] << 8) + h[1]) + ((h[2] << 8) + h[3]) +
+                 ((h[4] << 8) + h[5]) + ((h[6] << 8) + h[7]) +
+                 ((h[8] << 8) + h[9]) + // ignore old checksum: (h[10]<<8)+h[11]
+                 ((h[12] << 8) + h[13]) + ((h[14] << 8) + h[15]) +
+                 ((h[16] << 8) + h[17]) + ((h[18] << 8) + h[19]);
+  if ((checksum & 0xFFFF0000) > 0)
+    checksum = (checksum >> 16) + (checksum & 0x0000FFFF);
+  if ((checksum & 0xFFFF0000) > 0)
+    checksum = (checksum >> 16) + (checksum & 0x0000FFFF);
+  if ((checksum & 0xFFFF0000) > 0)
+    checksum = (checksum >> 16) + (checksum & 0x0000FFFF);
+  checksum = (~checksum) & 0x0000FFFF;
+  return checksum;
+}
 
 // TIMER UTILITIES
 

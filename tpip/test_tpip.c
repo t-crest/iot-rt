@@ -4,16 +4,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
-#include "tpip.h"
 #include <termios.h>
 #include <unistd.h>
+#include "tpip.h"
 
-//termious copy start
-
-// setup
-//unsigned long bufout[BUFSIZEWORDS];
+unsigned long bufout[BUFSIZEWORDS];
 unsigned long netbufin[BUFSIZEWORDS];
 
+//termious copy start
+// setup
 int set_interface_attribs(int fd, int speed)
 {
     struct termios tty;
