@@ -43,7 +43,7 @@ slip:
 
 tpiphost:
     #start listening on host
-	$(CC) tpip.c test_tpip.c
+	$(CC) tpiputil.c tpip.c test_tpip.c
 	./a.out
 
 tpippatmos:
