@@ -11,6 +11,13 @@
 // network buffer for one packet
 #define BUFSIZEWORDS (512 / 4)
 
+// to be expanded as needed
+typedef struct obb_t
+{
+    // flags
+    unsigned long flags;
+} obb_t;
+
 // UDP header: https://www.ietf.org/rfc/rfc768
 //  0      7 8     15 16    23 24    31
 //                +--------+--------+--------+--------+
@@ -95,7 +102,7 @@ typedef struct ip_t_ms {
 // ntohl(ipbuf.length) >> 28
 
 // loads a network buffer with an ip packet
-int packip(unsigned long networkbuf[], const ip_t *ip);
+int packip(unsigned int networkbuf[], const ip_t *ip);
 
 // unloads an ip packet from a network buffer
 void unpackip(ip_t *ip, const unsigned char *buf);

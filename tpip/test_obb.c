@@ -8,12 +8,7 @@
 #include <machine/patmos.h>
 #include "tpip.h"
 
-// to be expanded as needed
-typedef struct obb_t
-{
-    // flags
-    unsigned long flags;
-} obb_t;
+
 
 void printword(unsigned int val)
 {
@@ -42,6 +37,21 @@ __attribute__((noinline)) void xmit(char *pbuf, int len)
     while (((*(uart2_status_ptr)) & 0x01) == 0);
     *uart2_ptr = 0xaa; 
 
+}
+
+__attribute__((noinline)) void receive()
+{
+    volatile _IODEV int *uart2_ptr = (volatile _IODEV int *)0xF00e0004;
+    volatile _IODEV int *uart2_status_ptr = (volatile _IODEV int *)0xF00e0000;
+    
+    printf("patmos receive:\n");
+    unsigned char c;
+    do{
+        while (((*(uart2_status_ptr)) & 0x02) == 0); // busy wait
+        c = *uart2_ptr;
+        printf("-> 0x%02x\n", c);
+    } while(c != SLIP_END);
+    printf("! 0x%02x\n", c);
 }
 
 // this function should be changed to slip
@@ -112,6 +122,7 @@ int main(int argc, char *argv[])
     // function for slip
     xmitslip((char *)(&bufout[1]), (len - 1) * 4);
     printf("\n");
+    receive();
     printf("obb flag test completed on patmos...\n");
 
     return 0;

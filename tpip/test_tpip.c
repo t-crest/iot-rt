@@ -5,13 +5,20 @@
 #include "tpip.h"
 #include "tpiputil.h"
 
-static unsigned long bufout[BUFSIZEWORDS];
-static unsigned long netbufin[BUFSIZEWORDS];
+static unsigned int bufout[BUFSIZEWORDS];
+static unsigned int netbufin[BUFSIZEWORDS];
 
 // show how to send an ip packet over a network,
 // receive it, and look in the UDP data
 int main()
 {
+  printf( "    short int: %zd\n" , sizeof(short int) ) ;
+  printf( "          int: %zd\n" , sizeof(int) ) ;
+  printf( "     long int: %zd\n", sizeof(long int) ) ;
+  printf( "unsigned long: %zd\n", sizeof(unsigned long) ) ;
+  printf( "long long int: %zd\n", sizeof(long long int) ) ;
+  printf( "       size_t: %zd\n", sizeof(size_t) ) ;
+  printf( "        void*: %zd\n\n", sizeof(void *) ) ;
     unsigned short us = 0x20;
     unsigned char* ucp = (unsigned char*) &us;	
     printf("ucp %x\n", *ucp); 

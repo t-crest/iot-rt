@@ -215,9 +215,11 @@ int listentoserialslip(unsigned char *bufin)
   return -1;
 };
 
+static unsigned int newbufout[2000];
 
 int listentoserial(unsigned char *bufin)
 {
+memset(newbufout, 0, sizeof(newbufout));
   unsigned char *bufintmp = bufin;
   char *portname = "/dev/ttyUSB1";
   int fd;
@@ -232,14 +234,6 @@ int listentoserial(unsigned char *bufin)
   /*baudrate 115200, 8 bits, no parity, 1 stop bit */
   set_interface_attribs(fd, B115200);
   //set_mincount(fd, 0);                /* set to pure timed read */
-
-  /* simple output */
-  // wlen = write(fd, "Hello!\n", 7);
-  // if (wlen != 7)
-  // {
-  //     printf("Error from write: %d, %d\n", wlen, errno);
-  // }
-  // tcdrain(fd); /* delay for output */
 
   int rdlenall = 0;
   unsigned long words_to_get;
@@ -309,6 +303,52 @@ int listentoserial(unsigned char *bufin)
   printf("received ip datagram, network order:\n");
   bufprint(bufintmp, j);    
   printf("total %d bytes\n", j);
+
+  
+  
+    obb_t obb_msg_ack = (obb_t){.flags = 1};
+
+    // prepare sending
+    //   patmos, 10.0.0.2, 10002
+    //   server, 10.0.0.3, 10003
+    ip_t ipoutack = {.verhdl = (0x4 << 4) | 0x5,
+                     .tos = 0x00,
+                     .length = 20 + 8 + 4, // 5 + 2 + 1 words
+                     .id = 1,
+                     .ff = 0x4000,
+                     .ttl = 0x40,
+                     .prot = 0x11, // UDP
+                     .checksum = 0x0000,
+                     .srcip = (10 << 24) | (0 << 16) | (0 << 8) | 3,
+                     .dstip = (10 << 24) | (0 << 16) | (0 << 8) | 2,
+                     .udp.srcport = 10003, // 0x2713
+                     .udp.dstport = 10002, // 0x2712
+                     .udp.length = 8 + 4,
+                     .udp.data = (unsigned char[]){1, 0, 0, 0}};
+
+    //char hello[] = "Hello Second World\r\n";
+    
+    int len = packip((unsigned int*)newbufout, &ipoutack);
+printf("packip len = %d\n", len);
+  printf("newbufout:\n");
+  for (int i = 0; i < 9; i++)
+     printword(newbufout[i]);
+//while(1);
+/* simple output */
+  //wlen = write(fd, "Hello!\n", 7);
+  unsigned char *pnewbuf = (unsigned char*) &newbufout[1];
+  for(int i=0; i < 32; i++){
+    wlen = write(fd, pnewbuf+i, 1);
+      if (wlen != 1) printf("Error from write: %d, %d\n", wlen, errno);
+  for(int i = 0; i < 100; i++)
+    tcdrain(fd);
+  }
+  static unsigned char endslip = SLIP_END;
+  wlen = write(fd, &endslip, 1);
+  tcdrain(fd);
+  if (wlen != 1) printf("Error from write: %d, %d\n", wlen, errno);
+  for(int i = 0; i < 100; i++)
+    tcdrain(fd);
 
   return j;
 }

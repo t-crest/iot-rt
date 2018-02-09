@@ -38,7 +38,7 @@ void printipdatagram(ip_t *ip){
 }
 
 __attribute__((noinline)) 
-int packip(unsigned long networkbuf[], const ip_t *ip)
+int packip(unsigned int networkbuf[], const ip_t *ip)
 {
   networkbuf[1] = htonl((ip->verhdl << 24) | (ip->tos << 16) | htons(ip->length));
   networkbuf[2] = htonl((htons(ip->id) << 16) | htons(ip->ff));
