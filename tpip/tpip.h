@@ -95,18 +95,19 @@ typedef struct ip_t_ms {
 // ntohl(ipbuf.length) >> 28
 
 // loads a network buffer with an ip packet
-// first word is how many words in use
 int packip(unsigned long networkbuf[], const ip_t *ip);
 
 // unloads an ip packet from a network buffer
-// first word is how many words in use
-void unpackip(ip_t *ip, const unsigned int networkbuf[]);
+void unpackip(ip_t *ip, const unsigned char *buf);
 
 // print ip address
-void printip(unsigned long ip);
+void printipaddr(unsigned long ip);
+// and ip packet
+void printipdatagram(ip_t *ip);
 
 #ifndef __patmos__
 #include <arpa/inet.h>
+#define NOTPATMOS 1
 #else
 //not implemented on patmos
 inline unsigned int htonl(unsigned int val) { return val; }
@@ -115,4 +116,27 @@ inline unsigned int ntohl(unsigned int val) { return val; }
 inline unsigned short ntohs(unsigned short val) { return val; }
 #endif
 
+// pretty print a buffer
+void bufprint(const char* addr, int cnt);
+
+
+// SLIP sending:
+//   if SLIP_ESC 0xDB is in the datagram then these two bytes are sent 
+//     SLIP_ESC 0xDB -> SLIP_ESC 0xDB + SLIP_ESC_ESC 0xDD
+//   if SLIP_END 0xC0 is in the datagram then two bytes are sent 
+//     SLIP_END 0xC0 -> SLIP_ESC 0xDB + SLIP_ESC_END 0xDC
+//   finally append an END byte 
+//     SLIP_END 0xC0
+// SLIP receiving:
+//   if SLIP_ESC 0xDB is received then the next byte is either  
+//     0xDC (SLIP_ESC_END); really meaning 0xC0
+//       0xDB + 0xDC -> 0xC0
+//     0xDD (SLIP_ESC_ESC); really meaning 0xDB
+//       0xDB + 0xDD -> 0xDD
+//   done when the END byte is detected
+//     SLIP_END 0xC0; stop
+#define SLIP_END 0xC0
+#define SLIP_ESC 0xDB
+#define SLIP_ESC_END 0xDC
+#define SLIP_ESC_ESC 0xDD
 #endif // TPIP_H

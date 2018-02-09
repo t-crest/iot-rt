@@ -10,12 +10,35 @@
 #include <stdio.h>
 #include "tpip.h"
 
-void printip(unsigned long ip)
+void printipaddr(unsigned long ipaddr)
 {
-  printf("%d.%d.%d.%d\n", (int)((ip >> 24) & 0xFF), (int)((ip >> 16) & 0xFF), (int)((ip >> 8) & 0xFF), (int)(ip & 0xFF));
+  printf("%d.%d.%d.%d\n", (int)((ipaddr >> 24) & 0xFF), (int)((ipaddr >> 16) & 0xFF), 
+                          (int)((ipaddr >> 8) & 0xFF), (int)(ipaddr & 0xFF));
 }
 
-__attribute__((noinline)) int packip(unsigned long networkbuf[], const ip_t *ip)
+void printipdatagram(ip_t *ip){
+  printf("ip->verhdl = 0x%02x\n", ip->verhdl);
+  printf("ip->tos = 0x%02x\n", ip->tos);
+  printf("ip->length = 0x%04x %d\n", ip->length, ip->length);
+  printf("ip->id = 0x%04x\n", ip->id);
+  printf("ip->ff = 0x%04x\n", ip->ff);
+  printf("ip->ttl = 0x%02x\n", ip->ttl);
+  printf("ip->prot = 0x%02x\n", ip->prot);
+  printf("ip->checksum = 0x%04x\n", ip->checksum);
+  printf("ip->srcip = 0x%08x ", (unsigned int)ip->srcip); printipaddr(ip->srcip);
+  printf("ip->dstip = 0x%08x ", (unsigned int)ip->dstip); printipaddr(ip->dstip);
+  printf("ip->udp.srcport = 0x%04x\n", ip->udp.srcport); 
+  printf("ip->udp.dstport = 0x%04x\n", ip->udp.dstport);
+  printf("ip->udp.length = 0x%04x\n", ip->udp.length);
+  printf("ip->udp.checksum = 0x%08x\n", ip->udp.checksum); 
+  for (int i = 0; i < ip->udp.length && i < 10; i++)
+  {
+    printf("ip->udp.data[%02d] = 0x%02x\n", i, ip->udp.data[i]);
+  }
+}
+
+__attribute__((noinline)) 
+int packip(unsigned long networkbuf[], const ip_t *ip)
 {
   networkbuf[1] = htonl((ip->verhdl << 24) | (ip->tos << 16) | htons(ip->length));
   networkbuf[2] = htonl((htons(ip->id) << 16) | htons(ip->ff));
@@ -38,41 +61,39 @@ __attribute__((noinline)) int packip(unsigned long networkbuf[], const ip_t *ip)
   return networkbuf[0];
 }
 
-void unpackip(ip_t *ip, const unsigned int networkbuf[])
+void unpackip(ip_t *ip, const unsigned char *buf)
 {
-  unsigned int word = ntohl(networkbuf[1]);
-  ip->verhdl = (unsigned char)(word >> 24);
-  ip->tos = (unsigned char)((word >> 16) & 0xFF);
-  ip->length = ntohs(word & 0xFFFF);
-  word = ntohl(networkbuf[2]);
-  ip->id = ntohs((word >> 16) & 0xFFFF);
-  ip->ff = ntohs(word & 0xFFFF);
-  word = ntohl(networkbuf[3]);
-  ip->ttl = (unsigned char)(word >> 24);
-  ip->prot = (unsigned char)((word >> 16) & 0xFF);
-  ip->checksum = ntohs(word & 0xFFFF);
-  ip->srcip = ntohl(networkbuf[4]);
-  ip->dstip = ntohl(networkbuf[5]);
+  printf("buf:\n");
+  bufprint(buf, 32);
+  ip->verhdl = *buf; buf++;
+  ip->tos = *buf; buf++;
+  ip->length = ntohs(*((unsigned short*)(buf))); buf++; buf++;
+  ip->id = ntohs(*((unsigned short*)(buf))); buf++; buf++;
+  ip->ff = ntohs(*((unsigned short*)(buf))); buf++; buf++;
+  ip->ttl = *buf; buf++;
+  ip->prot = *buf; buf++;
+  ip->checksum = ntohs(*((unsigned short*)(buf))); buf++; buf++;
+  ip->srcip = ntohl(*((unsigned long*)(buf))); buf +=4;
+  ip->dstip = ntohl(*((unsigned long*)(buf))); buf +=4;
 
-  word = ntohl(networkbuf[6]);
-  ip->udp.srcport = ntohs((word >> 16) & 0xFFFF);
-  ip->udp.dstport = ntohs(word & 0xFFFF);
+  ip->udp.srcport = ntohs(*((unsigned short*)(buf))); buf++; buf++;
+  ip->udp.dstport = ntohs(*((unsigned short*)(buf))); buf++; buf++;
+  ip->udp.length = ntohs(*((unsigned short*)(buf))); buf++; buf++;
+  ip->udp.checksum = ntohs(*((unsigned short*)(buf))); buf++; buf++;
 
-  word = ntohl(networkbuf[7]);
-  ip->udp.length = ntohs((word >> 16) & 0xFFFF);
-  ip->udp.checksum = ntohs(word & 0xFFFF);
+  for (int i = 0; i < ip->udp.length - 8; buf++, i++)
+    ip->udp.data[i] = *buf;
+}
 
-  int udpdatawords = (ip->udp.length / 4) - 2;
-  for (int i = 0; i < udpdatawords; i++)
-  {
-    word = ntohl(networkbuf[8 + i]);
-    ip->udp.data[i * 4] = (unsigned char)(word >> 24);
-    ip->udp.data[i * 4 + 1] = (unsigned char)((word >> 16) & 0xFF);
-    ip->udp.data[i * 4 + 2] = (unsigned char)((word >> 8) & 0xFF);
-    ip->udp.data[i * 4 + 3] = (unsigned char)(word & 0xFF);
-  }
-
-  // check
-  //if ((1 + 5 + 2 + udpdatawords) != ntohl(networkbuf[0]))
-    //printf("error: networkbuf[0]=0x%08x\n", (unsigned int)ntohl(networkbuf[0]));
+void bufprint(const char* pbuf, int cnt)
+{
+    for(int i = 0; i < cnt; i++)
+    {
+        if(i == 0)
+            printf("0000: ");
+        else if(i % 4 == 0)
+            printf("\n%04d: ", i);
+        printf("0x%02x ", *(pbuf + i));
+    }  
+    printf("\n");
 }

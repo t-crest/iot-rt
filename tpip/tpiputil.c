@@ -215,9 +215,10 @@ int listentoserialslip(unsigned char *bufin)
   return -1;
 };
 
-// the IP/UDP packet has a header word with the length (in words)
+
 int listentoserial(unsigned char *bufin)
 {
+  unsigned char *bufintmp = bufin;
   char *portname = "/dev/ttyUSB1";
   int fd;
   int wlen;
@@ -244,32 +245,71 @@ int listentoserial(unsigned char *bufin)
   unsigned long words_to_get;
 
   /* simple noncanonical input */
+  unsigned char c = 0x00;
   do
   {
     int rdlen;
-    unsigned char buf[1000];
+    unsigned char buf[2000];
     rdlen = read(fd, buf, sizeof(buf) - 1);
     rdlenall += rdlen;
     if (rdlen > 0)
     {
       unsigned char *p;
-      printf("Read %d bytes from serial\n", rdlen);
+      printf("Read %2d bytes from serial\n", rdlen);
       for (p = buf; rdlen-- > 0; p++)
       {
         //printf(" 0x%02x ", *p);
         *bufin = *p;
+        c = *p;
         bufin++;
       }
       //printf("\n");
-      // look at first word for length
     }
     else if (rdlen < 0)
     {
       printf("Error from read: %d: %s\n", rdlen, strerror(errno));
     }
     /* repeat read to get full message */
-  } while (rdlenall <= 31); //while (1);
+  } while (c != SLIP_END); //(rdlenall <= 31); //while (1);
 
-  return rdlenall / 4;
+  printf("serial slip received:");
+  for(int i = 0; i < rdlenall; i++)
+  {
+    if (i % 4 == 0) 
+      printf("\n%04d: ", i);
+    printf("0x%02x ", *(bufintmp+i));
+  }
+  printf("\ntotal %d bytes\n", rdlenall);
+
+  // i is slip, j is data
+  int j =0;
+  for(int i = 0; i < rdlenall-1; i++)
+  {
+      unsigned char c = *(bufintmp+i);
+      if (c == SLIP_ESC) {
+        c = *(bufintmp + (i++));
+        if(c == SLIP_ESC_END) {
+          c = SLIP_END;  
+        } 
+        else if(c == SLIP_ESC_ESC) {
+          c = SLIP_ESC_ESC;
+        } else {
+          printf("slip error on receive index %d, expected SLIP_ESC_END or SLIP_ESC_ESC but got 0x%02x\n",
+                 i, c);
+        }
+      }
+      
+      *(bufintmp+j) = c;
+      j++;
+  }
+  // clear SLIP_END
+  *(bufintmp+j) = 0x00;
+
+  printf("\n");
+  printf("received ip datagram, network order:\n");
+  bufprint(bufintmp, j);    
+  printf("total %d bytes\n", j);
+
+  return j;
 }
 //termious copy end

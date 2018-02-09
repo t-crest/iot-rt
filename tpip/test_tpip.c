@@ -1,45 +1,38 @@
-//#include <errno.h>
-//#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
-//#include <termios.h>
-//#include <unistd.h>
 #include "tpip.h"
 #include "tpiputil.h"
 
 static unsigned long bufout[BUFSIZEWORDS];
 static unsigned long netbufin[BUFSIZEWORDS];
 
-
 // show how to send an ip packet over a network,
 // receive it, and look in the UDP data
 int main()
 {
-    //memset(netbufin, 0, BUFSIZEWORDS * 4);
+    unsigned short us = 0x20;
+    unsigned char* ucp = (unsigned char*) &us;	
+    printf("ucp %x\n", *ucp); 
+    unsigned int us2 = (unsigned short)*ucp;
+    printf("us2 %d\n", us2);
+    printf("NOT PATMOS=%d\n", NOTPATMOS);
     unsigned char mybuffer[8000];
-    // comment this out if listentoserialslip is enabled
-    listentoserial(mybuffer);
-    // this is the entry point for enabling slip receiving
-    listentoserialslip(mybuffer);
+    int count = listentoserial(mybuffer);
 
-    printf("\n");
-    for (int i = 0; i < 32; i++)
-    {
-        //printf("mybuffer[%d]:0x%02x \n", i, mybuffer[i]);
-    }
-
-    unsigned int *ulp = (unsigned int *)mybuffer;
-    //printf("*ulp=0x%08x\n", *ulp);
-    //printf("*ulp+1=0x%08x\n", *(ulp+1));
+    printf("mybuffer\n");
+    bufprint(mybuffer, count);
 
     // receive
     // empty ip packet
     ip_t *ipin = malloc(sizeof(ip_t));
     ipin->udp.data = (char[]){0, 0, 0, 0};
     //unpackip(ipin, netbufin);
-    unpackip(ipin, (unsigned int *)mybuffer);
+    unpackip(ipin, mybuffer);
+
+    printf("ipin:\n");
+    printipdatagram(ipin);
 
     // see what we got: 1, 2, 3, 4
     printf("udp data[0] received %d\n", ipin->udp.data[0]);
@@ -47,7 +40,8 @@ int main()
     printf("udp data[2] received %d\n", ipin->udp.data[2]);
     printf("udp data[3] received %d\n", ipin->udp.data[3]);
     // and from whom
-    printip(ipin->srcip);
+    printf("from ");
+    printipaddr(ipin->srcip);
     printf("\nobb flag test completed on host...\n");
 
     return 0;
