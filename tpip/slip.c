@@ -49,9 +49,13 @@ int tpip_slip_getchar(unsigned char *cptr) {
     volatile _IODEV int *uart2_ptr = (volatile _IODEV int *)0xF00e0004;
     volatile _IODEV int *uart2_status_ptr = (volatile _IODEV int *)0xF00e0000;
   //TODO: UART reading
-  while (((*(uart2_status_ptr)) & 0x02) == 0);
-  *cptr = *uart2_ptr;
-  return 1;
+  // while (((*(uart2_status_ptr)) & 0x02) == 0);
+  if (((*(uart2_status_ptr)) & 0x02) != 0) {
+    *cptr = *uart2_ptr;
+    return 1;
+  } else {
+    return 0;
+  }
 #endif
 #ifndef __patmos__
   return read(fd, cptr, 1);

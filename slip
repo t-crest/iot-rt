@@ -1,4 +1,0 @@
-
-slattach -d -L -l -p slip /dev/ttyUSB1 &
-sleep 3
-ifconfig sl0 mtu 1500 192.168.1.1 dstaddr 192.168.1.2
