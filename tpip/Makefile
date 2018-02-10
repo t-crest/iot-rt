@@ -13,8 +13,6 @@ help:
 	#   tpippatmos: patmos will send UDP over serial 2
 	#   clean: removing files
 
-
-
 pcap:
 	@echo 'tcpdump output:'
 	#tcpdump -r tpip.pcap
@@ -43,12 +41,12 @@ slip:
 
 tpiphost:
     #start listening on host
-	$(CC) tpiputil.c tpip.c test_tpip.c
+	$(CC) slip.c tpip.c test_tpip.c
 	./a.out
 
 tpippatmos:
 	#start on patmos (a second terminal)
-	patmos-clang -O2 test_obb.c tpip.c -o test_obb.elf
+	patmos-clang -O2 slip.c test_obb.c tpip.c -o test_obb.elf
 	patserdow -v /dev/ttyUSB0 test_obb.elf
 
 clean:

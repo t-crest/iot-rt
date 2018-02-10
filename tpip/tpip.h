@@ -9,7 +9,13 @@
 #define TPIP_H
 
 // network buffer for one packet
-#define BUFSIZEWORDS (512 / 4)
+#define BUFSIZE (2000)
+
+// period length (ms). Can also be cycles if on 'bare metal'
+#define PERIOD 100 // 1000 // must be less than 2,147,483,647
+
+// used by 'int currenttimemillis()'
+#define CLOCKS_PER_MSEC (CLOCKS_PER_SEC / 1000)
 
 // to be expanded as needed
 typedef struct obb_t
@@ -70,8 +76,8 @@ typedef struct ip_t
   unsigned char ttl;       // time to live (default 0x20)
   unsigned char prot;      // protocol (default UDP 17 => 0x11)
   unsigned short checksum; // default 0x0000
-  unsigned long srcip;     // src IP address
-  unsigned long dstip;     // dst IP address
+  unsigned int srcip;     // src IP address
+  unsigned int dstip;     // dst IP address
   udp_t udp;               // default ip data paylod: udp message
 } ip_t;
 
@@ -102,7 +108,7 @@ typedef struct ip_t_ms {
 // ntohl(ipbuf.length) >> 28
 
 // loads a network buffer with an ip packet
-int packip(unsigned int networkbuf[], const ip_t *ip);
+int packip(unsigned char *netbuf, const ip_t *ip);
 
 // unloads an ip packet from a network buffer
 void unpackip(ip_t *ip, const unsigned char *buf);
@@ -124,26 +130,21 @@ inline unsigned short ntohs(unsigned short val) { return val; }
 #endif
 
 // pretty print a buffer
-void bufprint(const char* addr, int cnt);
+void bufprint(const unsigned char* addr, int cnt);
 
 
-// SLIP sending:
-//   if SLIP_ESC 0xDB is in the datagram then these two bytes are sent 
-//     SLIP_ESC 0xDB -> SLIP_ESC 0xDB + SLIP_ESC_ESC 0xDD
-//   if SLIP_END 0xC0 is in the datagram then two bytes are sent 
-//     SLIP_END 0xC0 -> SLIP_ESC 0xDB + SLIP_ESC_END 0xDC
-//   finally append an END byte 
-//     SLIP_END 0xC0
-// SLIP receiving:
-//   if SLIP_ESC 0xDB is received then the next byte is either  
-//     0xDC (SLIP_ESC_END); really meaning 0xC0
-//       0xDB + 0xDC -> 0xC0
-//     0xDD (SLIP_ESC_ESC); really meaning 0xDB
-//       0xDB + 0xDD -> 0xDD
-//   done when the END byte is detected
-//     SLIP_END 0xC0; stop
-#define SLIP_END 0xC0
-#define SLIP_ESC 0xDB
-#define SLIP_ESC_END 0xDC
-#define SLIP_ESC_ESC 0xDD
+//typedef struct udpstruct_t udpstruct_t;
+typedef struct ipstruct_t
+{
+  unsigned char *header;
+  unsigned char *data; // this is the udp header
+} ipstruct_t;
+
+typedef struct udpstruct_t
+{
+  ipstruct_t *ipstructp;
+  unsigned char *header; // also the ip "data"
+  unsigned char *data;   // this is the udp data
+} udpstruct_t;
+
 #endif // TPIP_H

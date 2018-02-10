@@ -2,57 +2,136 @@
 #include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include "slip.h"
 #include "tpip.h"
-#include "tpiputil.h"
 
-static unsigned int bufout[BUFSIZEWORDS];
-static unsigned int netbufin[BUFSIZEWORDS];
+static unsigned char bufin[2000];
+static unsigned char bufout[2000];
 
 // show how to send an ip packet over a network,
 // receive it, and look in the UDP data
 int main()
 {
-  printf( "    short int: %zd\n" , sizeof(short int) ) ;
-  printf( "          int: %zd\n" , sizeof(int) ) ;
-  printf( "     long int: %zd\n", sizeof(long int) ) ;
-  printf( "unsigned long: %zd\n", sizeof(unsigned long) ) ;
-  printf( "long long int: %zd\n", sizeof(long long int) ) ;
-  printf( "       size_t: %zd\n", sizeof(size_t) ) ;
-  printf( "        void*: %zd\n\n", sizeof(void *) ) ;
-    unsigned short us = 0x20;
-    unsigned char* ucp = (unsigned char*) &us;	
-    printf("ucp %x\n", *ucp); 
-    unsigned int us2 = (unsigned short)*ucp;
-    printf("us2 %d\n", us2);
-    printf("NOT PATMOS=%d\n", NOTPATMOS);
-    unsigned char mybuffer[8000];
-    int count = listentoserial(mybuffer);
+    memset(bufin, 0, sizeof(bufin));
+    memset(bufout, 0, sizeof(bufout));
+    if(!initserial())
+      printf("error: serial port not initialized\n");
+    int count = serialreceive(bufin, sizeof(bufin));
 
-    printf("mybuffer\n");
-    bufprint(mybuffer, count);
+    printf("bufin, %d bytes:\n", count);
+    bufprint(bufin, count);
+    printf("\n");   
 
-    // receive
-    // empty ip packet
     ip_t *ipin = malloc(sizeof(ip_t));
     ipin->udp.data = (char[]){0, 0, 0, 0};
-    //unpackip(ipin, netbufin);
-    unpackip(ipin, mybuffer);
+    //ip_t *ipin = (ip_t*)bufin;
+    unpackip(ipin, bufin);
 
     printf("ipin:\n");
     printipdatagram(ipin);
+    printf("\n");   
 
-    // see what we got: 1, 2, 3, 4
-    printf("udp data[0] received %d\n", ipin->udp.data[0]);
-    printf("udp data[1] received %d\n", ipin->udp.data[1]);
-    printf("udp data[2] received %d\n", ipin->udp.data[2]);
-    printf("udp data[3] received %d\n", ipin->udp.data[3]);
-    // and from whom
-    printf("from ");
-    printipaddr(ipin->srcip);
-    printf("\nobb flag test completed on host...\n");
+    obb_t obb_msg_ack = (obb_t){.flags = 1};
+
+    // prepare sending
+    //   patmos, 10.0.0.2, 10002
+    //   server, 10.0.0.3, 10003
+    ip_t ipoutack = {.verhdl = (0x4 << 4) | 0x5,
+                     .tos = 0x00,
+                     .length = 20 + 8 + 4, // 5 + 2 + 1 words
+                     .id = 1,
+                     .ff = 0x4000,
+                     .ttl = 0x40,
+                     .prot = 0x11, // UDP
+                     .checksum = 0x0000,
+                     .srcip = (10 << 24) | (0 << 16) | (0 << 8) | 3,
+                     .dstip = (10 << 24) | (0 << 16) | (0 << 8) | 2,
+                     .udp.srcport = 10003, // 0x2713
+                     .udp.dstport = 10002, // 0x2712
+                     .udp.length = 8 + 4,
+                     .udp.data = (unsigned char[]){1, 0, 0, 0}};
+
+    int len = packip(bufout, &ipoutack);
+    printf("bufout, %d bytes\n", len);
+    bufprint(bufout, len);
+
+    int sent = serialsend(bufout, len);
+
+    printf("obb flag test completed on host...\n");
 
     return 0;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // // Basic testing
 // int main()

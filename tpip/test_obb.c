@@ -6,64 +6,40 @@
 #include <stdio.h>
 #include <string.h> //memset
 #include <machine/patmos.h>
+#include "slip.h"
 #include "tpip.h"
 
+static unsigned char bufout[2000];
 
-
-void printword(unsigned int val)
+__attribute__((noinline)) 
+int receive(unsigned char *pbuf)
 {
-    unsigned int hostorder = ntohl(val);
-    printf("0x%02x 0x%02x 0x%02x 0x%02x -> 0x%02x 0x%02x 0x%02x 0x%02x\n", 
-      ((val >> 24) & 0xFF), ((val >> 16) & 0xFF), ((val >> 8) & 0xFF), (val & 0xFF),
-           ((hostorder >> 24) & 0xFF), ((hostorder >> 16) & 0xFF), 
-           ((hostorder >> 8) & 0xFF), (hostorder & 0xFF));
-}
+    //todo use tpip_slip_is_esc and tpip_slip_was_esc
 
-static unsigned long bufout[BUFSIZEWORDS];
-
-__attribute__((noinline)) void xmit(char *pbuf, int len)
-{
-    volatile _IODEV int *uart2_ptr = (volatile _IODEV int *)0xF00e0004;
-    volatile _IODEV int *uart2_status_ptr = (volatile _IODEV int *)0xF00e0000;
-
-    //BUFSIZEWORDS
-    _Pragma("loopbound min 0 max 512") for (int i = 0; i < len * 4; ++i)
-    {
-        // verify worst wait here...
-        _Pragma("loopbound min 0 max 1000") while (((*(uart2_status_ptr)) & 0x01) == 0); // busy wait
-        *uart2_ptr = *(pbuf + i);
-        //printf(" 0x%02x", *(pbuf + i));
-    }
-    while (((*(uart2_status_ptr)) & 0x01) == 0);
-    *uart2_ptr = 0xaa; 
-
-}
-
-__attribute__((noinline)) void receive()
-{
-    volatile _IODEV int *uart2_ptr = (volatile _IODEV int *)0xF00e0004;
-    volatile _IODEV int *uart2_status_ptr = (volatile _IODEV int *)0xF00e0000;
-    
     printf("patmos receive:\n");
+    int cnt = 0;
     unsigned char c;
     do{
-        while (((*(uart2_status_ptr)) & 0x02) == 0); // busy wait
-        c = *uart2_ptr;
-        printf("-> 0x%02x\n", c);
-    } while(c != SLIP_END);
-    printf("! 0x%02x\n", c);
+        tpip_slip_getchar(&c);
+        if (tpip_slip_is_end(c)) break;
+	    *pbuf = c;
+        printf("pbuf[%02d] <- 0x%02x\n", cnt, c);
+        pbuf++;
+        cnt++;
+    } while(1);
+    printf("! END 0x%02x\n", c);
+    return cnt;
 }
 
 // this function should be changed to slip
 // modify this to encode and send over slip
-__attribute__((noinline)) void xmitslip(char *pbuf, int cnt)
+__attribute__((noinline)) 
+void xmitslip(unsigned char *pbuf, int cnt)
 {
     // cnt is the number of bytes to transmit
     printf("xmit ip datagram:\n");
     bufprint(pbuf, cnt);    
     printf("total %d bytes\n", cnt);
-    volatile _IODEV int *uart2_ptr = (volatile _IODEV int *)0xF00e0004;
-    volatile _IODEV int *uart2_status_ptr = (volatile _IODEV int *)0xF00e0000;
 
     //BUFSIZEWORDS
     printf("\n");
@@ -72,19 +48,17 @@ __attribute__((noinline)) void xmitslip(char *pbuf, int cnt)
     _Pragma("loopbound min 0 max 512") for (int i = 0; i < cnt; ++i, ++j)
     {
         // verify worst wait here...
-        _Pragma("loopbound min 0 max 1000") while (((*(uart2_status_ptr)) & 0x01) == 0); // busy wait
-        *uart2_ptr = *(pbuf + j);
+        tpip_slip_putchar(*(pbuf + j));
         if (j % 4 == 0) 
             printf("\n%04d: ", j);
         printf(" 0x%02x", *(pbuf + j));
     }
     if (j % 4 == 0) 
-            printf("\n%04d: ", j);
-    while (((*(uart2_status_ptr)) & 0x01) == 0);
-    *uart2_ptr = SLIP_END;
-    printf(" 0x%02x", SLIP_END);
-    printf("\n");
-    printf("total %d bytes\n", j + 1);
+        printf("\n%04d: ", j);
+    
+    tpip_slip_put_end();
+    
+    printf("xmit total %d bytes\n", j + 1);
 }
 
 int main(int argc, char *argv[])
@@ -111,18 +85,34 @@ int main(int argc, char *argv[])
                   .udp.length = 8 + 4,
                   .udp.data = (unsigned char[]){0, 0, 0, (unsigned char)obb_msg.flags}};
 
+    
+    printf("ipout:\n");
+    printipdatagram(&ipout);
     //char hello[] = "Hello Second World\r\n";
     int len = packip(bufout, &ipout);
-
-    for (int i = 0; i < 8; i++)
-        printword(bufout[i]);
+    printf("\n");
+    
+    printf("ipout \"raw\" mem (%d bytes):\n", len);
+    bufprint(bufout, len); 
+    printf("\n");
 
     printf("patmos sending: \n");
     //xmit((char *)bufout, len);
     // function for slip
-    xmitslip((char *)(&bufout[1]), (len - 1) * 4);
+    xmitslip(bufout, len);
     printf("\n");
-    receive();
+    unsigned char recbuf[2000];
+    memset(recbuf, 0, sizeof(recbuf));
+    int reccnt = receive(recbuf);
+
+    printf("ipin mem \"raw\" (%d bytes):\n", reccnt);
+    bufprint(recbuf, reccnt); 
+    printf("\n");
+
+    ip_t *ipin = (ip_t*) recbuf;
+    unpackip(ipin, recbuf);
+    printf("ipin:\n");
+    printipdatagram(ipin);
     printf("obb flag test completed on patmos...\n");
 
     return 0;
