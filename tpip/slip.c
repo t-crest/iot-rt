@@ -26,6 +26,7 @@ static unsigned char rxbuf[MAX];
 static int is_esc = 0;
 static int cnt = 0;
 static int rxfull = 0;
+static int slipoutcnt = 0;
 
 static unsigned char txbuf[MAX];
 // TODO some counters and flags for TX
@@ -69,6 +70,8 @@ void tpip_slip_putchar(unsigned char c) {
     volatile _IODEV int *uart2_status_ptr = (volatile _IODEV int *)0xF00e0000;
     while (((*(uart2_status_ptr)) & 0x01) == 0); // busy wait
     *uart2_ptr = c;
+    //printf("%02d:tpip_slip_putchar(0x%02x)\n", slipoutcnt, c);
+    slipoutcnt++;
 #endif
 }
 
@@ -99,6 +102,18 @@ int tpip_slip_was_esc(unsigned char c){
 
 void tpip_slip_put_end(){
   tpip_slip_putchar(END);
+}
+
+void tpip_slip_put_esc(){
+  tpip_slip_putchar(ESC);
+}
+
+void tpip_slip_put_esc_esc(){
+  tpip_slip_putchar(ESC_ESC);
+}
+
+void tpip_slip_put_esc_end(){
+  tpip_slip_putchar(ESC_END);
 }
 
 // peridic stuff
@@ -237,7 +252,7 @@ int initserial()
   }
   /*baudrate 115200, 8 bits, no parity, 1 stop bit */
   set_interface_attribs(fd, B115200);
-  //set_mincount(fd, 0);                /* set to pure timed read */
+  set_mincount(fd, 0);                /* set to pure timed read */
 
   return 1;
 }
@@ -258,14 +273,15 @@ int serialreceive(unsigned char *bufin, int max)
     int rdlen;
     unsigned char buf[2000];
     rdlen = read(fd, buf, sizeof(buf) - 1);
-    rdlenall += rdlen;
     if (rdlen > 0)
     {
       unsigned char *p;
       printf("Read %2d bytes from serial\n", rdlen);
+      int i = 0;
       for (p = buf; rdlen-- > 0; p++)
       {
-        printf(" 0x%02x ", *p);
+        printf("%02d: 0x%02x\n", i, *p);
+        i++;
         *bufin = *p;
         c = *p;
         bufin++;
@@ -277,6 +293,7 @@ int serialreceive(unsigned char *bufin, int max)
       printf("Error from read: %d: %s\n", rdlen, strerror(errno));
     }
     /* repeat read to get full message */
+    rdlenall += rdlen;
   } while (c != END && rdlenall <= max);
 
   printf("serial received %d \"slip\" bytes:\n", rdlenall);

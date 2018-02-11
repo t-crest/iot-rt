@@ -9,25 +9,37 @@
 #include "slip.h"
 #include "tpip.h"
 
+static unsigned char bufin[2000];
 static unsigned char bufout[2000];
 
 __attribute__((noinline)) 
 int receive(unsigned char *pbuf)
 {
-    //todo use tpip_slip_is_esc and tpip_slip_was_esc
-
-    printf("patmos receive:\n");
+    
     int cnt = 0;
-    unsigned char c;
+    int slipcnt = 0;
+    static unsigned char c;
     do{
-        tpip_slip_getchar(&c);
-        if (tpip_slip_is_end(c)) break;
-	    *pbuf = c;
-        printf("pbuf[%02d] <- 0x%02x\n", cnt, c);
-        pbuf++;
-        cnt++;
+      while(!tpip_slip_getchar(&c));
+      printf("slip %02d = 0x%02x\n", slipcnt, c);
+      slipcnt++;
+      if (tpip_slip_is_end(c)){
+        if(cnt == 0) 
+          continue; // slip frames starting with END
+        else
+          break;
+      } else if (tpip_slip_is_esc(c)){
+        while(!tpip_slip_getchar(&c));
+        printf("slip %02d = 0x%02x\n", slipcnt, c);
+        slipcnt++;
+        c = tpip_slip_was_esc(c);  
+      }
+	  *pbuf = c;
+      
+      pbuf++;
+      cnt++;
     } while(1);
-    printf("! END 0x%02x\n", c);
+    printf("patmos receive: %d data bytes (%d slip bytes):\n", cnt, slipcnt);    
     return cnt;
 }
 
@@ -41,37 +53,59 @@ void xmitslip(unsigned char *pbuf, int cnt)
     bufprint(pbuf, cnt);    
     printf("total %d bytes\n", cnt);
 
-    //BUFSIZEWORDS
     printf("\n");
-    printf("slip send: ");
+    printf("slip send:\n");
+    int i = 0;
     int j = 0;
-    _Pragma("loopbound min 0 max 512") for (int i = 0; i < cnt; ++i, ++j)
+    tpip_slip_put_end(); j++;
+    
+    for (i = 0; i < cnt; i++, j++)
     {
-        // verify worst wait here...
-        tpip_slip_putchar(*(pbuf + j));
-        if (j % 4 == 0) 
-            printf("\n%04d: ", j);
-        printf(" 0x%02x", *(pbuf + j));
+      unsigned char c = *(pbuf + i);
+      printf("%02d:data byte 0x%02x\n", i, c);
+      if(tpip_slip_is_esc(c)){
+        tpip_slip_put_esc();
+        tpip_slip_put_esc_esc();
+        j++;
+      } 
+      else if (tpip_slip_is_end(c)){
+        tpip_slip_put_esc();
+        tpip_slip_put_esc_end();
+        j++;
+      } 
+      else {
+        tpip_slip_putchar(c);
+      }
     }
-    if (j % 4 == 0) 
-        printf("\n%04d: ", j);
     
-    tpip_slip_put_end();
+    tpip_slip_put_end(); j++;
     
-    printf("xmit total %d bytes\n", j + 1);
+    printf("xmit total %d bytes\n", j);
 }
 
 int main(int argc, char *argv[])
 {
+    memset(bufin, 0, sizeof(bufin));
     memset(bufout, 0, sizeof(bufout));
 
+    unsigned char testmem[4];
+    memset(testmem, 0, sizeof(testmem));
+    printf("0x%02x\n", testmem[2]);
+    testmem[2] = 2;
+    printf("0x%02x\n", testmem[2]);
+    testmem[3] = 3;
+    printf("2 0x%02x\n", testmem[2]);
+    testmem[3] = 3;
+    printf("3 0x%02x\n", testmem[3]);
+
+    printf("patmos step 1: an UDP packet will now be sent to the PC with 4th byte set in the obb flag struct\n");
     obb_t obb_msg = (obb_t){.flags = 1};
 
     // prepare sending
     //   patmos, 10.0.0.2, 10002
     //   server, 10.0.0.3, 10003
     ip_t ipout = {.verhdl = (0x4 << 4) | 0x5,
-                  .tos = 0x00,
+                  .tos = 0x03, //0x00,
                   .length = 20 + 8 + 4, // 5 + 2 + 1 words
                   .id = 1,
                   .ff = 0x4000,
@@ -83,24 +117,21 @@ int main(int argc, char *argv[])
                   .udp.srcport = 10002, // 0x2712
                   .udp.dstport = 10003, // 0x2713
                   .udp.length = 8 + 4,
-                  .udp.data = (unsigned char[]){0, 0, 0, (unsigned char)obb_msg.flags}};
+                  .udp.data = (unsigned char[]){0, 0, 0, 1}};//(unsigned char)obb_msg.flags}};
 
     
     printf("ipout:\n");
     printipdatagram(&ipout);
-    //char hello[] = "Hello Second World\r\n";
     int len = packip(bufout, &ipout);
-    printf("\n");
-    
-    printf("ipout \"raw\" mem (%d bytes):\n", len);
+    ipchecksum(bufout);
     bufprint(bufout, len); 
     printf("\n");
-
+    
     printf("patmos sending: \n");
-    //xmit((char *)bufout, len);
-    // function for slip
     xmitslip(bufout, len);
     printf("\n");
+ 
+    printf("patmos step 2: an UDP packet will now be received from the PC with 1st byte set in the obb flag struct\n"); 
     unsigned char recbuf[2000];
     memset(recbuf, 0, sizeof(recbuf));
     int reccnt = receive(recbuf);
@@ -111,7 +142,7 @@ int main(int argc, char *argv[])
 
     ip_t *ipin = (ip_t*) recbuf;
     unpackip(ipin, recbuf);
-    printf("ipin:\n");
+    printf("ip datagram from pc:\n");
     printipdatagram(ipin);
     printf("obb flag test completed on patmos...\n");
 

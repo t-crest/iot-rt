@@ -11,23 +11,26 @@
 #include <time.h>
 #include "tpip.h"
 
-void printipaddr(unsigned long ipaddr)
+void printipaddr(unsigned long ipaddr, char* ipstr)
 {
-  printf("%d.%d.%d.%d\n", (int)((ipaddr >> 24) & 0xFF), (int)((ipaddr >> 16) & 0xFF), 
+  sprintf(ipstr, "%d.%d.%d.%d", (int)((ipaddr >> 24) & 0xFF), (int)((ipaddr >> 16) & 0xFF), 
                           (int)((ipaddr >> 8) & 0xFF), (int)(ipaddr & 0xFF));
 }
 
 void printipdatagram(ip_t *ip){
   printf("ip->verhdl       = 0x%02x\n", ip->verhdl);
   printf("ip->tos          = 0x%02x\n", ip->tos);
-  printf("ip->length       = 0x%04x (%d bytes)\n", ip->length, ip->length);
+  printf("ip->length       = 0x%04x (%d)\n", ip->length, ip->length);
   printf("ip->id           = 0x%04x\n", ip->id);
   printf("ip->ff           = 0x%04x\n", ip->ff);
   printf("ip->ttl          = 0x%02x\n", ip->ttl);
   printf("ip->prot         = 0x%02x\n", ip->prot);
   printf("ip->checksum     = 0x%04x\n", ip->checksum);
-  printf("ip->srcip        = 0x%08x ", (unsigned int)ip->srcip); printipaddr(ip->srcip);
-  printf("ip->dstip        = 0x%08x ", (unsigned int)ip->dstip); printipaddr(ip->dstip);
+  char ipstr[20]; 
+  printipaddr(ip->srcip, ipstr);
+  printf("ip->srcip        = 0x%08x (%s)\n", (unsigned int)ip->srcip, ipstr);
+  printipaddr(ip->dstip, ipstr);
+  printf("ip->dstip        = 0x%08x (%s)\n", (unsigned int)ip->dstip, ipstr);
   printf("ip->udp.srcport  = 0x%04x\n", ip->udp.srcport); 
   printf("ip->udp.dstport  = 0x%04x\n", ip->udp.dstport);
   printf("ip->udp.length   = 0x%04x\n", ip->udp.length);
@@ -39,14 +42,19 @@ void printipdatagram(ip_t *ip){
 __attribute__((noinline)) 
 int packip(unsigned char *netbuf, const ip_t *ip)
 {
-  *netbuf = ip->verhdl;                               netbuf += 1;
-  *netbuf = ip->tos;                                  netbuf += 1;
-  *(unsigned short*)netbuf = htons(ip->length);       netbuf += 2;
-  *(unsigned short*)netbuf = htons(ip->id);           netbuf += 2;
-  *(unsigned short*)netbuf = htons(ip->ff);           netbuf += 2;
-  *netbuf = ip->ttl;                                  netbuf += 1;
-  *netbuf = ip->prot;                                 netbuf += 1;
-  *(unsigned short*)netbuf = htons(ip->checksum);     netbuf += 2;
+// issue: writing byte, byte, and unsigned short does not work
+// wordaround: write the whole word at the same time
+//  *netbuf = ip->verhdl; netbuf += 1;
+//  *netbuf = ip->tos; netbuf += 1;
+//  *((unsigned short*)netbuf) = htons(ip->length); netbuf += 2;
+  *((unsigned int*)netbuf) = htonl((ip->verhdl << 24) | (ip->tos << 16) | htons(ip->length)); netbuf += 4;
+//  *(unsigned short*)netbuf = htons(ip->id);           netbuf += 2;
+//  *(unsigned short*)netbuf = htons(ip->ff);           netbuf += 2;
+  *((unsigned int*)netbuf) = htonl((htons(ip->id) << 16) | (htons(ip->ff))); netbuf += 4;
+  //*netbuf = ip->ttl;                                  netbuf += 1;
+  //*netbuf = ip->prot;                                 netbuf += 1;
+  //*(unsigned short*)netbuf = htons(ip->checksum);     netbuf += 2;
+  *((unsigned int*)netbuf) = (ip->ttl << 24) | (ip->prot << 16) | htons(ip->checksum); netbuf += 4;
   *(unsigned int*)netbuf = htonl(ip->srcip);          netbuf += 4;
   *(unsigned int*)netbuf = htonl(ip->dstip);          netbuf += 4;
   *(unsigned short*)netbuf = htons(ip->udp.srcport);  netbuf += 2;
@@ -95,10 +103,32 @@ void bufprint(const unsigned char* pbuf, int cnt)
 
         printf("0x%02x ", *(pbuf + i));
     }  
+printf("\n");
+    for(int i = 0; i < cnt; i++)
+    {
+        printf("%02d: 0x%02x\n", i, *(pbuf + i));
+    }  
     printf("\n");
 }
 
 // // CHECKSUM UTILITIES (on the original structs, so that is to be updated)
+
+void ipchecksum(unsigned char* ipraw){
+  unsigned int checksum = 0;
+  checksum += (ipraw[ 0] << 8) | ipraw[ 1]; // version, ihl and tos
+  checksum += (ipraw[ 2] << 8) | ipraw[ 3]; // total length
+  checksum += (ipraw[ 4] << 8) | ipraw[ 5]; // identification 
+  checksum += (ipraw[ 6] << 8) | ipraw[ 7]; // flags and fragment offset
+  checksum += (ipraw[ 8] << 8) | ipraw[ 9]; // ttl and protocol
+  checksum += (ipraw[12] << 8) | ipraw[13]; // src IP 
+  checksum += (ipraw[14] << 8) | ipraw[15]; // src IP 
+  checksum += (ipraw[16] << 8) | ipraw[17]; // src IP 
+  checksum += (ipraw[18] << 8) | ipraw[19]; // src IP 
+  checksum  = (checksum & 0xFFFF) + (checksum >> 16);
+  ipraw[10] = checksum >> 8;
+  ipraw[11] = checksum & 0xFF;
+}
+
 
 // 16-bit (pairs of two byte array entries)
 int datasum(char data[], int arraysize)

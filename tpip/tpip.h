@@ -68,17 +68,17 @@ typedef struct udp_t
 // ip datagram
 typedef struct ip_t
 {
-  unsigned char verhdl;    // default ver. and header words (default 0x4 | 0x5)
-  unsigned char tos;       // default 0x00
-  unsigned short length;   // total length (20 + udpmsg.length for UDP)
-  unsigned short id;       // identification incremented on each new datagram
-  unsigned short ff;       // (don't) fragment and fragment offset (default 010b | 0 => 0x4000)
-  unsigned char ttl;       // time to live (default 0x20)
-  unsigned char prot;      // protocol (default UDP 17 => 0x11)
-  unsigned short checksum; // default 0x0000
-  unsigned int srcip;     // src IP address
-  unsigned int dstip;     // dst IP address
-  udp_t udp;               // default ip data paylod: udp message
+  unsigned char  verhdl;    // default ver. and header words (default 0x4 | 0x5)
+  unsigned char  tos;       // default 0x00
+  unsigned short length;    // total length (20 + udpmsg.length for UDP)
+  unsigned short id;        // identification incremented on each new datagram
+  unsigned short ff;        // (don't) fragment and fragment offset (default 010b | 0 => 0x4000)
+  unsigned char  ttl;       // time to live (default 0x20)
+  unsigned char  prot;      // protocol (default UDP 17 => 0x11)
+  unsigned short checksum;  // default 0x0000
+  unsigned int   srcip;     // src IP address
+  unsigned int   dstip;     // dst IP address
+  udp_t udp;                // default ip data paylod: udp message
 } ip_t;
 
 
@@ -114,15 +114,20 @@ int packip(unsigned char *netbuf, const ip_t *ip);
 void unpackip(ip_t *ip, const unsigned char *buf);
 
 // print ip address
-void printipaddr(unsigned long ip);
+void printipaddr(unsigned long ip, char* ipstr);
 // and ip packet
 void printipdatagram(ip_t *ip);
+
+// called after packip
+void ipchecksum(unsigned char* ip);
 
 #ifndef __patmos__
 #include <arpa/inet.h>
 #define NOTPATMOS 1
 #else
-//not implemented on patmos
+// patmos is big endian and it is the same as network order, so 
+// these functions do nothing and they are there since they are not
+// in newlib.
 inline unsigned int htonl(unsigned int val) { return val; }
 inline unsigned short htons(unsigned short val) { return val; }
 inline unsigned int ntohl(unsigned int val) { return val; }
@@ -133,6 +138,7 @@ inline unsigned short ntohs(unsigned short val) { return val; }
 void bufprint(const unsigned char* addr, int cnt);
 
 
+//todo: delete these structs. they were part of the first attempt
 //typedef struct udpstruct_t udpstruct_t;
 typedef struct ipstruct_t
 {

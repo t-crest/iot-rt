@@ -14,8 +14,11 @@ int main()
 {
     memset(bufin, 0, sizeof(bufin));
     memset(bufout, 0, sizeof(bufout));
+
     if(!initserial())
       printf("error: serial port not initialized\n");
+
+    printf("pc step 1: now waiting for an UDP packet from patmos with (without) a flag set in the obb test\n");
     int count = serialreceive(bufin, sizeof(bufin));
 
     printf("bufin, %d bytes:\n", count);
@@ -31,7 +34,13 @@ int main()
     printipdatagram(ipin);
     printf("\n");   
 
-    obb_t obb_msg_ack = (obb_t){.flags = 1};
+    printf("pc step 2: the pc will now clear the obb flag and set another one as a response\n");
+    obb_t obb_msg_ack;
+    obb_t *obb_msg = (obb_t *) ipin->udp.data;
+    if(obb_msg->flags)
+      obb_msg_ack.flags = 1;
+    else
+      obb_msg_ack.flags = 0;
 
     // prepare sending
     //   patmos, 10.0.0.2, 10002
@@ -49,7 +58,7 @@ int main()
                      .udp.srcport = 10003, // 0x2713
                      .udp.dstport = 10002, // 0x2712
                      .udp.length = 8 + 4,
-                     .udp.data = (unsigned char[]){1, 0, 0, 0}};
+                     .udp.data = (unsigned char[]){obb_msg_ack.flags, 0, 0, 0}};
 
     int len = packip(bufout, &ipoutack);
     printf("bufout, %d bytes\n", len);

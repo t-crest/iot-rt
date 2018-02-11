@@ -1,6 +1,6 @@
 CC=gcc
 # CC=clang
-
+PATMOSHOME=~/t-crest/patmos
 SERIAL?=/dev/ttyUSB0
 
 help:
@@ -11,8 +11,7 @@ help:
 	#   slip: (ms: will you write what it does?)
 	#   tpiphost: host listener (UDP on serial 2)
 	#   tpippatmos: patmos will send UDP over serial 2
-	#   clean: removing files
-
+	#   clean: removing fi
 pcap:
 	@echo 'tcpdump output:'
 	#tcpdump -r tpip.pcap
@@ -47,6 +46,7 @@ tpiphost:
 tpippatmos:
 	#start on patmos (a second terminal)
 	patmos-clang -O2 slip.c test_obb.c tpip.c -o test_obb.elf
+	cd $(PATMOSHOME) && $(MAKE) config
 	patserdow -v /dev/ttyUSB0 test_obb.elf
 
 clean:
