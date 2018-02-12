@@ -8,7 +8,7 @@ tpIP: a Time-predictable TCP/IP Stack for Cyber-Physical Systems.
 
 Most of our evaluation is using the T-CREST/Patmos processor in an FPGA.
 For the general build instructions of T-CREST please look into the
-[Main README](../../../README.md).
+[Main README of Patmos](https://github.com/t-crest/patmos).
 
 # A Second Serial Port
 
