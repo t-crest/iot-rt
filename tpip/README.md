@@ -1,16 +1,60 @@
-# Real-Time HTTP/TCP/IP and UDP/IP Stack for IoT (ISORC)
+# tpIP a Time-predictable TCP/IP Stack
 
-This project is on building time-predictable networked devices.
-As a starting point we look how to implement a time-predictable TCP/IP stack.
-First experiments have been done with Scala.
-Currently we focus on implementing the tpIP stack in C to be worst-case execution
-time (WCET) analyzable and to exeute on the Patmos/T-CREST platform.
+This folder contains the source code supporting following paper:
 
-We plan to submit a first paper in this project to ISORC 2018.
+Martin Schoeberl and Rasmus Ulslev Pedersen.
+tpIP: a Time-predictable TCP/IP Stack for Cyber-Physical Systems.
+*Submitted to ISORC 2018*.
 
-As a next step we will look into REST for IoT on top if the tpIP stack.
+Most of our evaluation is using the T-CREST/Patmos processor in an FPGA.
+For the general build instructions of T-CREST please look into the
+[Main README](../../../README.md).
 
-Instructions:
+# A Second Serial Port
+
+We use SLIP as link layer protocol, which means the PC and the FPGA board
+need a second serial port.
+
+The second port is a USB/TTL cable connected to IO pins on the expansion header.
+It is connected to the expansion port at the bottom (see Figure 4-15
+GPIO Pin Arrangement in the DE2 user manual on page 46).
+
+To build a Patmos configuration with the second port us the project `altde2-all`.
+This is best setup by using a local `config.mk` file (in `t-crest/patmos`) as follows:
+
+```
+BOARD=altde2-all
+```
+
+Connect the USB/TTL serial cable to those pins:
+
+```
+
+
+               | * * |  GND
+               | * * |
+               | * * |
+               | * * |
+               | * * |
+    RX -- AH23 | * * |  AG26 -- TX
+               +-----+
+```
+
+RX and TX names are from Patmos view. Connect TX from your USB/TTL
+device to RX of Patmos, and RX to TX.
+
+For information how to test this serial setup see at [patmos](../patmos).
+
+Questions to: martin@jopdesign.com
+
+
+# tpIP Experiments
+
+The following experiment is a reimplementation of a UDP based protocol
+used in a railway application on single track lines of the Austrian
+railway (OEBB).
+
+
 First, the host pc must listen:
 ```
 make tpiphost
@@ -22,4 +66,4 @@ and then run patmos
 make tpippatmos
 ```
 
-A flag is set by patos, which the host pc reacts to, and clears, and sets a new acknowledge flag.
+A flag is set by Patmos, which the host pc reacts to, and clears, and sets a new acknowledge flag.
