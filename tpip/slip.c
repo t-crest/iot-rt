@@ -47,10 +47,9 @@ int tpip_slip_init(char *str) {
 
 int tpip_slip_getchar(unsigned char *cptr) {
 #ifdef __patmos__
-    volatile _IODEV int *uart2_ptr = (volatile _IODEV int *)0xF00e0004;
-    volatile _IODEV int *uart2_status_ptr = (volatile _IODEV int *)0xF00e0000;
-  //TODO: UART reading
-  // while (((*(uart2_status_ptr)) & 0x02) == 0);
+  volatile _IODEV int *uart2_ptr = (volatile _IODEV int *)0xF00e0004;
+  volatile _IODEV int *uart2_status_ptr = (volatile _IODEV int *)0xF00e0000;
+
   if (((*(uart2_status_ptr)) & 0x02) != 0) {
     *cptr = *uart2_ptr;
     return 1;
@@ -68,6 +67,7 @@ void tpip_slip_putchar(unsigned char c) {
 #ifdef __patmos__
     volatile _IODEV int *uart2_ptr = (volatile _IODEV int *)0xF00e0004;
     volatile _IODEV int *uart2_status_ptr = (volatile _IODEV int *)0xF00e0000;
+    // MS: should try once and not have a busy wait here
     while (((*(uart2_status_ptr)) & 0x01) == 0); // busy wait
     *uart2_ptr = c;
     //printf("%02d:tpip_slip_putchar(0x%02x)\n", slipoutcnt, c);
@@ -119,29 +119,34 @@ void tpip_slip_put_esc_end(){
 // peridic stuff
 // TODO: sometimes a wrong end of packet detection. Worked in the non-polling mode :-()
 // TODO: should also contain the sending
+// noline for WCET analysis
+__attribute__((noinline)) void tpip_slip_run();
+
 void tpip_slip_run() {
 
-    unsigned char c;
+  unsigned char c;
 
-    for(int i=0; i<4; ++i) {
-      if(tpip_slip_getchar(&c) == 1) {   
-        if (is_esc) {
-          if (c == ESC_ESC) {
-            rxbuf[cnt++] = ESC;
-          } else if (c == ESC_END) {
-            rxbuf[cnt++] = END;
-          }
-          is_esc = 0;
-        } else if (c == ESC) {
-          is_esc = 1;
-        } else if (c == END) {
-          rxfull = 1;
-        } else {
-          rxbuf[cnt++] = c;
+  // MS: why is this loop not recognized by platin?
+//  _Pragma("loopbound min 4 max 4")
+//  for(int i=0; i<4; ++i) {
+    if(tpip_slip_getchar(&c) == 1) {   
+      if (is_esc) {
+        if (c == ESC_ESC) {
+          rxbuf[cnt++] = ESC;
+        } else if (c == ESC_END) {
+          rxbuf[cnt++] = END;
         }
-        if (cnt == 2000) cnt = 0;
+        is_esc = 0;
+      } else if (c == ESC) {
+        is_esc = 1;
+      } else if (c == END) {
+        rxfull = 1;
+      } else {
+        rxbuf[cnt++] = c;
       }
+      if (cnt == 2000) cnt = 0;
     }
+//  }
 }
 
 int tpip_slip_rxfull() {

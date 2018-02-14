@@ -15,4 +15,8 @@ int initserial();
 int serialreceive(unsigned char *bufin, int max);
 int serialsend(unsigned char *bufin, int cnt);
 
+// MS: we should use those Link Layer macros!
+
+void tpip_slip_run();
+
 #endif //SLIP_H

@@ -146,5 +146,7 @@ int main(int argc, char *argv[])
     printipdatagram(ipin);
     printf("obb flag test completed on patmos...\n");
 
+    tpip_slip_run();
+
     return 0;
 }
