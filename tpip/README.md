@@ -4,7 +4,7 @@ This folder contains the source code supporting following paper:
 
 Martin Schoeberl and Rasmus Ulslev Pedersen.
 tpIP: a Time-predictable TCP/IP Stack for Cyber-Physical Systems.
-*Submitted to ISORC 2018*.
+[*Submitted to ISORC 2018*](https://cps-research-group.github.io/ISORC2018/html/program.html).
 
 Most of our evaluation is using the T-CREST/Patmos processor in an FPGA.
 For the general build instructions of T-CREST please look into the
@@ -19,7 +19,7 @@ The second port is a USB/TTL cable connected to IO pins on the expansion header.
 It is connected to the expansion port at the bottom (see Figure 4-15
 GPIO Pin Arrangement in the DE2 user manual on page 46).
 
-To build a Patmos configuration with the second port us the project `altde2-all`.
+To build a Patmos configuration with the second port as the project `altde2-all`.
 This is best setup by using a local `config.mk` file (in `t-crest/patmos`) as follows:
 
 ```

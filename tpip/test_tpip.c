@@ -19,6 +19,9 @@ int main()
     if(!initserial())
       printf("error: serial port not initialized\n");
 
+    int clearcount = serialclear();
+    printf("pc step 0: clear serial port for old data: %d bytes\n", clearcount);
+
     printf("pc step 1: now waiting for an UDP packet from patmos with (without) a flag set in the obb test\n");
     int count = serialreceive(bufin, sizeof(bufin));
 
@@ -67,7 +70,7 @@ int main()
 
     int sent = serialsend(bufout, len);
 
-    printf("obb flag test completed on host...\n");
+    printf("obb flag test completed on host...sent %d bytes\n", sent);
 
     return 0;
 }

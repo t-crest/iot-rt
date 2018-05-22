@@ -12,6 +12,7 @@ int tpip_slip_is_esc(unsigned char c);
 int tpip_slip_was_esc(unsigned char c);
 
 int initserial();
+int serialclear();
 int serialreceive(unsigned char *bufin, int max);
 int serialsend(unsigned char *bufin, int cnt);
 

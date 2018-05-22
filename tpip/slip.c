@@ -262,6 +262,65 @@ int initserial()
   return 1;
 }
 
+// returns number of bytes cleared from in-buffer 
+// the function should be called before the serial port is used to make sure
+// some old data in the serial in-buffer does not disrupt the program 
+int serialclear()
+{
+  int rdlenall = 0;
+  int rdlen = -1;
+  do
+  {
+    unsigned char buf[2000];
+    rdlen = read(fd, buf, sizeof(buf) - 1);
+    if (rdlen > 0)
+    {
+      unsigned char *p;
+      printf("Cleared %2d bytes from serial\n", rdlen);
+      rdlenall += rdlen;
+      int i = 0;
+      for (p = buf; rdlen-- > 0; p++)
+      {
+        printf("%02d: 0x%02x\n", i, *p);
+        i++;
+      }
+    }
+    else if (rdlen < 0)
+    {
+      printf("Error from clear read: %d: %s\n", rdlen, strerror(errno));
+    }
+    /* repeat to fully clear buffer */
+  } while (rdlen > 0);
+
+  printf("serial cleared %d bytes:\n", rdlenall);
+  
+  // how many characters were in the buffer
+  return rdlenall;
+}
+
+// it appends SLIP_END as the last byte
+int serialsend(unsigned char *bufin, int cnt)
+{
+  int txcnt = 0;
+  int wlen;
+  for(int i=0; i < cnt; i++, bufin++){
+    wlen = write(fd, bufin, 1);
+    txcnt += wlen;
+    if (wlen != 1) printf("Error from write: %d, %d\n", wlen, errno);
+    for(int i = 0; i < 100; i++)
+      tcdrain(fd);
+  }
+  static unsigned char endslip = END;
+  wlen = write(fd, &endslip, 1);
+  txcnt += wlen;
+  tcdrain(fd);
+  if (wlen != 1) printf("Error from write: %d, %d\n", wlen, errno);
+  for(int i = 0; i < 100; i++)
+    tcdrain(fd);
+
+  return txcnt;
+}
+
 // returns number of bytes received when SLIP_END is received
 int serialreceive(unsigned char *bufin, int max)
 {
@@ -282,6 +341,7 @@ int serialreceive(unsigned char *bufin, int max)
     {
       unsigned char *p;
       printf("Read %2d bytes from serial\n", rdlen);
+      rdlenall += rdlen;
       int i = 0;
       for (p = buf; rdlen-- > 0; p++)
       {
@@ -298,7 +358,6 @@ int serialreceive(unsigned char *bufin, int max)
       printf("Error from read: %d: %s\n", rdlen, strerror(errno));
     }
     /* repeat read to get full message */
-    rdlenall += rdlen;
   } while (c != END && rdlenall <= max);
 
   printf("serial received %d \"slip\" bytes:\n", rdlenall);
@@ -308,7 +367,10 @@ int serialreceive(unsigned char *bufin, int max)
   for(int i = 0; i < rdlenall-1; i++)
   {
       unsigned char c = *(bufintmp+i);
-      if (c == ESC) {
+      // check if END is transmitted as the first character
+      if (c == END){
+        c = *(bufintmp + (i++));
+      } else if (c == ESC) {
         c = *(bufintmp + (i++));
         if(c == ESC_END) {
           c = END;  
@@ -334,23 +396,4 @@ int serialreceive(unsigned char *bufin, int max)
   return j;
 }
 
-// it appends SLIP_END as the last byte
-int serialsend(unsigned char *bufin, int cnt)
-{
-  int wlen;
-  for(int i=0; i < cnt; i++, bufin++){
-    wlen = write(fd, bufin, 1);
-    if (wlen != 1) printf("Error from write: %d, %d\n", wlen, errno);
-    for(int i = 0; i < 100; i++)
-      tcdrain(fd);
-  }
-  static unsigned char endslip = END;
-  wlen = write(fd, &endslip, 1);
-  tcdrain(fd);
-  if (wlen != 1) printf("Error from write: %d, %d\n", wlen, errno);
-  for(int i = 0; i < 100; i++)
-    tcdrain(fd);
-
-  return wlen;
-}
 #endif
