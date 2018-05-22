@@ -5,6 +5,7 @@
 #include "slip.h"
 #include "tpip.h"
 
+// TODO: define constant
 static unsigned char bufin[2000];
 static unsigned char bufout[2000];
 
