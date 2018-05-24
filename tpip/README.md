@@ -26,18 +26,17 @@ This is best setup by using a local `config.mk` file (in `t-crest/patmos`) as fo
 BOARD=altde2-all
 ```
 
-Connect the USB/TTL serial cable to those pins:
+Connect the USB/TTL serial cable to the following pins on GP10:
 
 ```
-
-
-               | * * |  GND
+               | * * |  
                | * * |
                | * * |
                | * * |
                | * * |
-    RX -- AH23 | * * |  AG26 -- TX
+ RX -- 39/AH23 | * * |  40/AG26 -- TX
                +-----+
+                GP 10
 ```
 
 RX and TX names are from Patmos view. Connect TX from your USB/TTL
@@ -67,3 +66,5 @@ make tpippatmos
 ```
 
 A flag is set by Patmos, which the host pc reacts to, and clears, and sets a new acknowledge flag.
+
+Note: If `make tpiphost` results in an error, then try to run tpippatos once to ensure the serial port is enabled.

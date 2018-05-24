@@ -356,6 +356,8 @@ int serialreceive(unsigned char *bufin, int max)
     else if (rdlen < 0)
     {
       printf("Error from read: %d: %s\n", rdlen, strerror(errno));
+      printf("Error info: Ensure that the serial port is active (i.e., run 'make tpippatmos' first.)\n");
+      break;
     }
     /* repeat read to get full message */
   } while (c != END && rdlenall <= max);
