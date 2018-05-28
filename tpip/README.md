@@ -29,7 +29,7 @@ BOARD=altde2-all
 Connect the USB/TTL serial cable to the following pins on GP10:
 
 ```
-               | * * |  
+               | * * |  GND
                | * * |
                | * * |
                | * * |
