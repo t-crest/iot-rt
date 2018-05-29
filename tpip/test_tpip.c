@@ -35,6 +35,7 @@ int main()
     unpackip(ipin, bufin);
 
     printf("ipin:\n");
+    printf("BUG: the slip delimiter is in byte[0]\n");
     printipdatagram(ipin);
     printf("\n");   
 
