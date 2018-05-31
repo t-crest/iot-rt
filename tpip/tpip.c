@@ -47,10 +47,14 @@ int packip(unsigned char *netbuf, const ip_t *ip)
 //  *netbuf = ip->verhdl; netbuf += 1;
 //  *netbuf = ip->tos; netbuf += 1;
 //  *((unsigned short*)netbuf) = htons(ip->length); netbuf += 2;
-  *((unsigned int*)netbuf) = htonl((ip->verhdl << 24) | (ip->tos << 16) | htons(ip->length)); netbuf += 4;
+  printf("++ip->verhdl = 0x%08x\n", ip->verhdl);
+  printf("hex word 0 test= 0x%08x\n", ((((unsigned int)ip->verhdl) << 24) | (((unsigned int)ip->tos) << 16) | htons(((unsigned int)ip->length))));
+  *((unsigned int*)netbuf) = htonl((((unsigned int)ip->verhdl) << 24) | (((unsigned int)ip->tos) << 16) | htons(((unsigned int)ip->length))); 
+printf("hex word 0 = 0x%08x\n", *((unsigned int*)netbuf)); netbuf += 4;
 //  *(unsigned short*)netbuf = htons(ip->id);           netbuf += 2;
 //  *(unsigned short*)netbuf = htons(ip->ff);           netbuf += 2;
-  *((unsigned int*)netbuf) = htonl((htons(ip->id) << 16) | (htons(ip->ff))); netbuf += 4;
+  *((unsigned int*)netbuf) = htonl((htons(ip->id) << 16) | (htons(ip->ff))); 
+  printf("hex word 1 = 0x%08x\n", *((unsigned int*)netbuf)); netbuf += 4;
   //*netbuf = ip->ttl;                                  netbuf += 1;
   //*netbuf = ip->prot;                                 netbuf += 1;
   //*(unsigned short*)netbuf = htons(ip->checksum);     netbuf += 2;
@@ -92,6 +96,7 @@ void unpackip(ip_t *ip, const unsigned char *buf)
     ip->udp.data[i] = *buf;
 }
 
+//todo: fix bug on printing (unaligned memory access on patmos?)
 void bufprint(const unsigned char* pbuf, int cnt)
 {
     for(int i = 0; i < cnt; i++)
@@ -101,12 +106,17 @@ void bufprint(const unsigned char* pbuf, int cnt)
         else if(i % 4 == 0)
             printf("\n%04d: ", i);
 
-        printf("0x%02x ", *(pbuf + i));
+        printf("0x%02x ", (unsigned int)(*(pbuf + i)));
     }  
-printf("\n");
+    printf("\n");
     for(int i = 0; i < cnt; i++)
     {
         printf("%02d: 0x%02x\n", i, *(pbuf + i));
+    }  
+    printf("\n");
+    for(int i = 0; i < cnt/4; i++)
+    {
+        printf("word %02d: 0x%08x\n", i, *((unsigned int*)(pbuf + (i*4))));
     }  
     printf("\n");
 }

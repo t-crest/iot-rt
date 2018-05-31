@@ -14,7 +14,7 @@
 #include "slip.h"
 #include "config.h"
 
-#define END 0xc0
+#define END 0xc0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
 #define ESC 0xdb
 #define ESC_END 0xdc
 #define ESC_ESC 0xdd
@@ -369,9 +369,10 @@ int serialreceive(unsigned char *bufin, int max)
   for(int i = 0; i < rdlenall-1; i++)
   {
       unsigned char c = *(bufintmp+i);
-      // check if END is transmitted as the first character
-      if (c == END){
-        c = *(bufintmp + (i++));
+      // check if END was transmitted alsl as the first character
+      //   which we do to make SLIP more resilient
+      if ((i == 0) && (c == END)){
+        i++;
       } else if (c == ESC) {
         c = *(bufintmp + (i++));
         if(c == ESC_END) {

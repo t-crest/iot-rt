@@ -50,7 +50,7 @@ int main()
     // prepare sending
     //   patmos, 10.0.0.2, 10002
     //   server, 10.0.0.3, 10003
-    ip_t ipoutack = {.verhdl = (0x4 << 4) | 0x5,
+    ip_t ipoutack = {.verhdl = (0x04 << 4) | 0x05,
                      .tos = 0x00,
                      .length = 20 + 8 + 4, // 5 + 2 + 1 words
                      .id = 1,

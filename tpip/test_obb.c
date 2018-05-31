@@ -1,3 +1,4 @@
+// runs on patmos
 // minimal test file to get started on obb
 // the server receives a request and responds (i.e., acknowledges)
 //   with the same request msg id and increments the flag
@@ -15,7 +16,6 @@ static unsigned char bufout[2000];
 __attribute__((noinline)) 
 int receive(unsigned char *pbuf)
 {
-    
     int cnt = 0;
     int slipcnt = 0;
     static unsigned char c;
@@ -88,15 +88,9 @@ int main(int argc, char *argv[])
     memset(bufin, 0, sizeof(bufin));
     memset(bufout, 0, sizeof(bufout));
 
-    unsigned char testmem[4];
-    memset(testmem, 0, sizeof(testmem));
-    printf("0x%02x\n", testmem[2]);
-    testmem[2] = 2;
-    printf("0x%02x\n", testmem[2]);
-    testmem[3] = 3;
-    printf("2 0x%02x\n", testmem[2]);
-    testmem[3] = 3;
-    printf("3 0x%02x\n", testmem[3]);
+    printf("sizeof(unsigned char) =%lu\n", sizeof(unsigned char));
+    printf("sizeof(unsigned short)=%lu\n", sizeof(unsigned short));
+    printf("sizeof(unsigned int)  =%lu\n", sizeof(unsigned int));
 
     printf("patmos step 1: an UDP packet will now be sent to the PC with 4th byte set in the obb flag struct\n");
     obb_t obb_msg = (obb_t){.flags = 1};
@@ -109,7 +103,7 @@ int main(int argc, char *argv[])
                   .length = 20 + 8 + 4, // 5 + 2 + 1 words
                   .id = 1,
                   .ff = 0x4000,
-                  .ttl = 0x40,
+                  .ttl = 0x30,
                   .prot = 0x11, // UDP
                   .checksum = 0x0000,
                   .srcip = (10 << 24) | (0 << 16) | (0 << 8) | 2,
@@ -123,7 +117,10 @@ int main(int argc, char *argv[])
     printf("ipout:\n");
     printipdatagram(&ipout);
     int len = packip(bufout, &ipout);
+    printf("bufout before checksum:\n");
+    bufprint(bufout, len); 
     ipchecksum(bufout);
+    printf("bufout after checksum:\n");
     bufprint(bufout, len); 
     printf("\n");
     
