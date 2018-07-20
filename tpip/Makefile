@@ -3,6 +3,9 @@ CC=gcc
 PATMOSHOME=~/t-crest/patmos
 SERIAL?=/dev/ttyUSB0
 
+#TODO: make a use-case build system that takes an argument (use-case number)
+#      and runs the use-case. This should be done for the two targets tpiphost and tpippatmos
+
 help:
 	# Make file for tpip
 	#   pcap: tcpdump stuff
