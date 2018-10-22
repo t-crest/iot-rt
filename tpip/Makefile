@@ -2,6 +2,16 @@ CC=gcc
 # CC=clang
 PATMOSHOME=~/t-crest/patmos
 SERIAL?=/dev/ttyUSB0
+LIBETH=$(PATMOSHOME)/c/ethlib
+TCP_ROLE=SERVER
+
+# Flags for compiling normal applications
+# Assuming 2 MB of main memory
+CFLAGS?=-target patmos-unknown-unknown-elf -O2 \
+	-I$(PATMOSHOME)/c -I $(PATMOSHOME)/c/libelf/ \
+	-I $(LIBETH) \
+	-mpatmos-disable-vliw \
+	$(DEFINES)
 
 #TODO: make a use-case build system that takes an argument (use-case number)
 #      and runs the use-case. This should be done for the two targets tpiphost and tpippatmos
@@ -21,22 +31,28 @@ pcap:
 	#tcpdump -nnvXSs 0 -c1 -i any
 
 wcet:
-	patmos-clang -O2 -mserialize=tpip.pml test_obb.c tpip.c slip.c
-#patmos-clang -O0 -mserialize=tpip.pml tpip.c
-#the function to be analyzed in listed just before --report
-#functions: checksum waitfornextperiod wait
-#platin wcet -i tpip.pml -b a.out -e getipdstip  --report
-#platin wcet -i tpip.pml -b a.out -e wait --report
+	patmos-clang -O2 -mserialize=tpip.pml obb_demo.c tpip.c slip.c
+	# patmos-clang -O0 -mserialize=tpip.pml tpip.c
+	# the function to be analyzed in listed just before --report
+	# functions: checksum waitfornextperiod wait
+	# platin wcet -i tpip.pml -b a.out -e getipdstip  --report
+	# platin wcet -i tpip.pml -b a.out -e wait --report
 	platin wcet -i tpip.pml -b a.out -e packip
 	platin wcet -i tpip.pml -b a.out -e tpip_slip_run
 	#platin wcet -i tpip.pml -b a.out -e xmit
 	#platin visualize -i tpip.pml -f waitfornextperiod
-#platin wcet -i tpip.pml -b a.out -e currenttimemillis --report
-#platin wcet -i tpip.pml -b a.out -e calculateipchecksum --report
+	# platin wcet -i tpip.pml -b a.out -e currenttimemillis --report
+	# platin wcet -i tpip.pml -b a.out -e calculateipchecksum --report
 
 #use this target to see how macros are expanded
 macrocheck:
 	$(CC) -E *.c
+
+# library for ethernet
+.PHONY: libeth
+libeth: $(LIBETH)
+$(LIBETH): $(patsubst ethlib/%.c,$(BUILDDIR)/ethlib/%.o,$(wildcard ethlib/*.c))
+	patmos-ar r $@ $^
 
 slip:
 	$(CC) test_slip.c slip.c
@@ -49,9 +65,18 @@ tpiphost:
 
 tpippatmos:
 	#start on patmos (a second terminal)
-	patmos-clang -O2 slip.c test_obb.c tpip.c -o test_obb.elf
-	cd $(PATMOSHOME) && $(MAKE) config
-	patserdow -v /dev/ttyUSB0 test_obb.elf
+	patmos-clang $(CFLAGS) $(LIBETH)/*.c slip.c obb_demo.c tpip.c -o obb_demo.elf
+	cd $(PATMOSHOME) && $(MAKE) config BOARD=altde2-all
+	patserdow -v /dev/ttyUSB0 obb_demo.elf
+
+tcphost:
+	$(CC) -D $(TCP_ROLE) test_tcp.c -o test_tcp_$(TCP_ROLE).out
+	./test_tcp_$(TCP_ROLE).out
+
+tcppatmos:
+	patmos-clang -D $(TCP_ROLE) $(CFLAGS) $(LIBETH)/*.c test_tcp.c -o test_tcp_$(TCP_ROLE).elf
+	cd $(PATMOSHOME) && $(MAKE) config BOARD=altde2-all
+	patserdow -v /dev/ttyUSB0 test_tcp_$(TCP_ROLE).elf
 
 clean:
 	rm -f *.out *.pcap *.pml *.png *.elf
