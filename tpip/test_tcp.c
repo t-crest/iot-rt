@@ -137,20 +137,19 @@ int tcp_server_run(){
 }
 
 int tcp_client_run(){
-    char *hello = "Hello from client";
+    char *hello = "Hello from Patmos";
     #if defined(__PATMOS__)
     static unsigned char target_ip[4] = {192, 168, 2, 50};
     static unsigned char target_mac[6] = {0x80, 0xce, 0x62, 0xd8, 0xc7, 0x39};
     static unsigned char spoof_mac[6] = {0xb8, 0x27, 0xeb, 0x5d, 0x63, 0xdf};
     unsigned char connect_attempts = TCP_SYN_RETRIES;	
     unsigned char resolved = 0;
+    tcp_connection conn;
     //MAC controller settings
     eth_iowr(0x40, 0xEEF0DA42);
     eth_iowr(0x44, 0x000000FF);
     eth_iowr(0x00, 0x0000A423);
     ipv4_set_my_ip((unsigned char[4]){192, 168, 2, 1});
-    tcp_connection conn;
-    *led_ptr = 0xFF;
     tcp_init_connection(&conn, my_mac, target_mac, (unsigned char[4]){192, 168, 2, 1}, target_ip, 40106, PORT);
     puts("Connecting...\n");
     do{
@@ -158,11 +157,11 @@ int tcp_client_run(){
         eth_mac_receive(rx_addr, TCP_RETRY_INTERVAL);
         if(mac_packet_type(rx_addr)==ARP){
             arp_process_received(rx_addr, tx_addr);
-            eth_mac_receive(rx_addr, TCP_RETRY_INTERVAL);
             *led_ptr = 0xF0;
-        } else {
+            continue;
+        } else if(mac_packet_type(rx_addr)==TCP) {
             resolved = tcp_handle(tx_addr, rx_addr, &conn, (unsigned char*) "", 0);
-            *led_ptr = 0xFF;
+            *led_ptr = resolved;
         }
         *led_ptr = connect_attempts;
         connect_attempts--;
@@ -171,15 +170,15 @@ int tcp_client_run(){
     {
         puts("Sending...\n");
         do{
-            tcp_push(tx_addr, rx_addr, &conn, (unsigned char*) "Hello from Patmos", 17);
+            tcp_push(tx_addr, rx_addr, &conn, (unsigned char*) hello, strlen(hello));
             eth_mac_receive(rx_addr, TCP_RETRY_INTERVAL);
             if(mac_packet_type(rx_addr)==ARP){
                 arp_process_received(rx_addr, tx_addr);
-                eth_mac_receive(rx_addr, TCP_RETRY_INTERVAL);
                 *led_ptr = 0xF0;
-            } else {
-                resolved = tcp_handle(tx_addr, rx_addr, &conn, (unsigned char*) "Hello from Patmos", 17);
-                *led_ptr = 0xFF;
+                continue;
+            } else if(mac_packet_type(rx_addr)==TCP) {
+                resolved = tcp_handle(tx_addr, rx_addr, &conn, (unsigned char*) "", 0);
+                *led_ptr = resolved;
             }
         }while(!resolved);
         puts("Hello message sent\n"); 
@@ -188,15 +187,27 @@ int tcp_client_run(){
             eth_mac_receive(rx_addr, TCP_RETRY_INTERVAL);
             if(mac_packet_type(rx_addr)==ARP){
                 arp_process_received(rx_addr, tx_addr);
-                eth_mac_receive(rx_addr, TCP_RETRY_INTERVAL);
                 *led_ptr = 0xF0;
                 continue;
-            } else {
+            } else if(mac_packet_type(rx_addr)==TCP) {
                 resolved = tcp_handle(tx_addr, rx_addr, &conn, (unsigned char*) buffer, 1024);
-                *led_ptr = 0xFF;
+                *led_ptr = resolved;
             }
         }while(!resolved);
         puts((char*)buffer);
+        do{
+            tcp_close(tx_addr, rx_addr, &conn);
+            eth_mac_receive(rx_addr, TCP_RETRY_INTERVAL);
+            if(mac_packet_type(rx_addr)==ARP){
+                arp_process_received(rx_addr, tx_addr);
+                eth_mac_receive(rx_addr, TCP_RETRY_INTERVAL);
+                *led_ptr = 0xF0;
+                continue;
+            } else if(mac_packet_type(rx_addr)==TCP) {
+                resolved = tcp_handle(tx_addr, rx_addr, &conn, (unsigned char*) buffer, 1024);
+                *led_ptr = resolved;
+            }
+        }while(!resolved);
     } else if(connect_attempts == 0 && conn.status != ESTABLISHED) {
         puts("Failed to connect after max retries.\n");
         *led_ptr = 0x88;
