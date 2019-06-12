@@ -69,14 +69,19 @@ tpippatmos:
 	cd $(PATMOSHOME) && $(MAKE) config BOARD=altde2-all
 	patserdow -v /dev/ttyUSB0 obb_demo.elf
 
-tcphost:
-	$(CC) -D $(TCP_ROLE) test_tcp.c -o test_tcp_$(TCP_ROLE).out
+tcphost-comp:
+	$(CC) -D $(TCP_ROLE) test_tcp_host.c -o test_tcp_host_$(TCP_ROLE).out
+
+tcphost-run:
 	./test_tcp_$(TCP_ROLE).out
 
-tcppatmos:
-	patmos-clang -D $(TCP_ROLE) $(CFLAGS) $(LIBETH)/*.c test_tcp.c -o test_tcp_$(TCP_ROLE).elf
+tcppatmos-comp:
+	patmos-clang -D $(TCP_ROLE) $(CFLAGS) $(LIBETH)/*.c test_tcp_patmos.c -o test_tcp_patmos_$(TCP_ROLE).elf
+
+tcopatmos-run:
 	cd $(PATMOSHOME) && $(MAKE) config BOARD=altde2-all
-	patserdow -v /dev/ttyUSB0 test_tcp_$(TCP_ROLE).elf
+	sleep 2
+	patserdow -v $(SERIAL) test_tcp_$(TCP_ROLE).elf
 
 clean:
 	rm -f *.out *.pcap *.pml *.png *.elf
