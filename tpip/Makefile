@@ -4,7 +4,7 @@ PATMOSHOME=~/t-crest/patmos
 SERIAL?=/dev/ttyUSB0
 LIBETH=$(PATMOSHOME)/c/ethlib
 TCP_ROLE=SERVER
-
+include $(PATMOSHOME)/c/Makefile
 # Flags for compiling normal applications
 # Assuming 2 MB of main memory
 CFLAGS?=-target patmos-unknown-unknown-elf -O2 \
