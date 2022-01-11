@@ -82,14 +82,18 @@ Note: If `make tpiphost` results in an error, then try to run tpippatos once to 
 # Using Ethernet as the link layer
 ## For Linux Virtual Machine:
 
-If you are using a Virtual machine like VMware Workstation, first configure the network adaptor setting as 'custom'
-or bridge mode, I set it as custom. Then choose a virtual network, probably VMnet0. Next, go to the virtual network 
+If you are using a Virtual machine like VMware Workstation, first configure the network adaptor setting as '*custom*'
+or '*bridge*' mode, I set it as '*custom*'. Then choose a virtual network, probably *VMnet0*. Next, go to the virtual network 
 editor and choose the correct Network Interface Card(NIC) for the virtual network which should be used as a cable 
 connected Ethernet controller. In some linux version, you can set the IP address directly from a GUI, while I couldn't.
+
 Solution:(Ubuntu 20.02)
 
+```
 cd /etc/netplan/
-There should be a file called '\*.yaml', in my case it is '*01-network-manager-all.yaml*'
+```
+There should be a file called '\**.yaml*', in my case it is '*01-network-manager-all.yaml*'
+
 Open it and add the following lines:
 ```
  ens33:
@@ -98,8 +102,10 @@ Open it and add the following lines:
             gateway4: 192.168.24.1
             nameservers:
                 addresses: [114.114.114.114,8.8.8.8]
-
 ```
+Finally, run command `netplan try` to see if there are any errors, then apply the changes by `netplan apply`.
+Sometimes restart is required, so run `systemctl restart system-networkd` after.
+
 Now the VM should be able to communicate with the board.
 
 ## For Windows:
