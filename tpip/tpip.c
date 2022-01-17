@@ -9,14 +9,23 @@
 
 #include <stdio.h>
 #include <time.h>
+#include "eth_patmos_io.h"
+#include "mac.h"
+#include "eth_mac_driver.h"
 #include "tpip.h"
+
+unsigned char my_ip[4] = {192, 168, 24, 50};
 
 void printipaddr(unsigned long ipaddr, char* ipstr)
 {
   sprintf(ipstr, "%d.%d.%d.%d", (int)((ipaddr >> 24) & 0xFF), (int)((ipaddr >> 16) & 0xFF), 
                           (int)((ipaddr >> 8) & 0xFF), (int)(ipaddr & 0xFF));
 }
-
+void tpip_print_ip(unsigned int ip){
+  char ipstr[20]; 
+  printipaddr(ip, ipstr);
+  printf("IP Address       = 0x%08x (%s)\n", ip, ipstr);
+}
 void printipdatagram(ip_t *ip){
   printf("ip->verhdl       = 0x%02x\n", ip->verhdl);
   printf("ip->tos          = 0x%02x\n", ip->tos);
@@ -39,6 +48,17 @@ void printipdatagram(ip_t *ip){
     printf("ip->udp.data[%02d] = 0x%02x\n", i, ip->udp.data[i]);
 }
 
+int tpip_compare_ip(unsigned char * my_ip, unsigned int destination_ip){
+  for(int i = 0; i < 4; i++){
+    if(my_ip[i] != ((destination_ip >> (24-8*i)) & 0xFF)){
+      printf("my_IP[%d] is: %d", i, my_ip[i]);
+      printf("destination IP[%d] is: %d\n", i, ((destination_ip >> (24-8*i)) & 0xFF));
+      return 0;
+    }
+      
+  }
+  return 1;
+}
 __attribute__((noinline)) 
 int packip(unsigned char *netbuf, const ip_t *ip)
 {
@@ -50,9 +70,9 @@ int packip(unsigned char *netbuf, const ip_t *ip)
   printf("++ip->verhdl = 0x%08x\n", ip->verhdl);
   printf("hex word 0 test= 0x%08x\n", ((((unsigned int)ip->verhdl) << 24) | (((unsigned int)ip->tos) << 16) | htons(((unsigned int)ip->length))));
   *((unsigned int*)netbuf) = htonl((((unsigned int)ip->verhdl) << 24) | (((unsigned int)ip->tos) << 16) | htons(((unsigned int)ip->length))); 
-printf("hex word 0 = 0x%08x\n", *((unsigned int*)netbuf)); netbuf += 4;
-//  *(unsigned short*)netbuf = htons(ip->id);           netbuf += 2;
-//  *(unsigned short*)netbuf = htons(ip->ff);           netbuf += 2;
+  printf("hex word 0 = 0x%08x\n", *((unsigned int*)netbuf)); netbuf += 4;
+  //  *(unsigned short*)netbuf = htons(ip->id);           netbuf += 2;
+  //  *(unsigned short*)netbuf = htons(ip->ff);           netbuf += 2;
   *((unsigned int*)netbuf) = htonl((htons(ip->id) << 16) | (htons(ip->ff))); 
   printf("hex word 1 = 0x%08x\n", *((unsigned int*)netbuf)); netbuf += 4;
   //*netbuf = ip->ttl;                                  netbuf += 1;
@@ -84,9 +104,15 @@ void unpackip(ip_t *ip, const unsigned char *buf)
   ip->ttl = *buf; buf++;
   ip->prot = *buf; buf++;
   ip->checksum = ntohs(*((unsigned short*)(buf))); buf++; buf++;
-  ip->srcip = ntohl(*((unsigned long*)(buf))); buf +=4;
-  ip->dstip = ntohl(*((unsigned long*)(buf))); buf +=4;
-
+  printf("Buf index: %d \n", *buf);
+  // One strange Bug: the first 2 bytes srcip will duplicate checksum, only srcip and dstip get this
+  // from srcport is normal
+  // ip->srcip = ntohl(*((unsigned int*)(buf))); buf +=4;
+  ip->srcip = *buf << 24 | *(++buf) << 16 | *(++buf) << 8 | *(++buf); 
+  printf("Source IP: %d \n", ip->srcip);
+  // ip->dstip = ntohl(*((unsigned int*)(buf))); buf +=4;
+  ip->dstip = *(++buf) << 24 | *(++buf) << 16 | *(++buf) << 8 | *(++buf);
+  buf++;
   ip->udp.srcport = ntohs(*((unsigned short*)(buf))); buf++; buf++;
   ip->udp.dstport = ntohs(*((unsigned short*)(buf))); buf++; buf++;
   ip->udp.length = ntohs(*((unsigned short*)(buf))); buf++; buf++;
@@ -121,8 +147,140 @@ void bufprint(const unsigned char* pbuf, int cnt)
     printf("\n");
 }
 
-// // CHECKSUM UTILITIES (on the original structs, so that is to be updated)
+int tpip_get_length(unsigned char* bufin){
+  unsigned short length;
+  length = bufin[14+2]; // From IPV4 Header
+  length = length << 8;
+	length = length + bufin[14+3]; 
+	return length;
+}
+int tpip_load_bufin(unsigned int rx_addr, unsigned char* bufin){
+  unsigned char dst_mac[6];
+  int length;
+  enum eth_protocol protocol_type;
+  // mac_addr_dest(rx_addr,dst_mac);
+  // for(int i = 0; i < 6; i++){
+  //   if(dst_mac[i] != my_mac[i]){
+  //     printf("destination mac does not match! \n");
+  //     return 0;
+  //   } 
+  // }
+  protocol_type = mac_packet_type(rx_addr);
+  switch (protocol_type)
+  {
+    case UNSUPPORTED:
+      printf("Unknown protocol, filtered out. \n");
+      return 0;
 
+    case UDP:
+      printf("A UDP packet is received. \n");
+      length = tpip_get_length(bufin);
+      for(int i = 0; i < length; i++){
+        bufin[i] = mem_iord_byte(rx_addr + i);
+      }
+    break;
+  
+    case ARP: // Has a fixed length
+      printf("An ARP packet is received. \n");
+      for(int i =0; i < 42; i++){
+        bufin[i] = mem_iord_byte(rx_addr + i);
+      }
+    break;
+
+    default:
+      break;
+  }
+
+  return 1;
+}
+
+int tpip_load_bufout(unsigned int tx_addr, unsigned char* bufout, unsigned int length){
+  printf("Loading MAC: ");
+  for(int i = 0; i < length; i++){
+    printf("BUFFER DATA: %d ", bufout[i]);
+    mem_iowr_byte(tx_addr + i, bufout[i]);
+    printf("MAC buffer data: %d \n", mem_iord_byte(tx_addr + i));
+  }
+  for(int i = 0; i < length; i++){
+    if(mem_iord_byte(tx_addr + i) != bufout[i]){
+      return 0;
+    }
+  }
+  return 1;
+}
+
+// // CHECKSUM UTILITIES (on the original structs, so that is to be updated)
+int tpip_verify_checksum(unsigned char* ip){
+  unsigned int checksum;
+	checksum = 0;
+	_Pragma("loopbound min 0 max 10")
+	for (int i = 0; i<20; i=i+2){
+		checksum = checksum + (ip[14 + i] << 8) + (ip[15 + i] & 0xFF);
+	}
+	if ((checksum & 0xFFFF0000) > 0)
+		checksum = (checksum & 0xFFFF) + (checksum >> 16);
+	if ((checksum & 0xFFFF0000) > 0)
+		checksum = (checksum & 0xFFFF) + (checksum >> 16);
+	if ((checksum & 0xFFFF0000) > 0)
+		checksum = (checksum & 0xFFFF) + (checksum >> 16);
+	checksum = ((~checksum) & 0xFFFF);
+	if (checksum == 0){
+		return 1;
+	}else{
+		return 0;
+	}	
+}
+int tpip_udp_verify_checksum(ip_t *ip) {
+  unsigned short int udp_length;
+	unsigned short int corrected_length;
+	unsigned int checksum = 0;
+	udp_length = ip->udp.length;
+  for(int i = 0; i < udp_length -8; i++){
+    printf("UDP DATA[%d]: %02x",i, ip->udp.data[i]);
+  }
+	printf("\n");
+	if ((udp_length & 0x1) == 0){
+		//even
+		corrected_length = udp_length;
+	}else{
+		//odd, add 8 bits zero at the end of data
+		corrected_length = udp_length + 1;
+    printf("ip->udp.data[udp_length-8] = %d \n", ip->udp.data[udp_length-8]);
+    printf("ip->udp.data[udp_length-9] = %d \n", ip->udp.data[udp_length-1-8]);
+    
+		ip->udp.data[udp_length-8] = 0x00;
+	}
+  printf("Corrected_length: %d \n", corrected_length);
+  checksum = ip->udp.srcport + ip->udp.dstport + ip->udp.length + ip->udp.checksum;
+	printf("temp check sum: %d \n", checksum);
+  _Pragma("loopbound min 0 max 14") // why max 28????????
+	for (int i = 0; i<corrected_length - 8; i = i+2){
+		checksum = checksum + (ip->udp.data[i] << 8) + (ip->udp.data[i+1] & 0xFF);
+    printf("checksum udp data: %d\n", ip->udp.data[i]);
+	}
+	
+  // UDP pseudo header: Use the IP src and dest
+  checksum = checksum + 
+              (ip->srcip >> 16) + (ip->srcip & 0xFFFF) + 
+              (ip->dstip >> 16) + (ip->dstip & 0xFFFF);
+  // UDP pseudo header: zero | Protocol Number | UDP length
+	checksum = checksum + 0x0011 + udp_length;
+  printf("1. check sum: %d \n", checksum);
+  
+	if ((checksum & 0xFFFF0000) > 0)
+		checksum = (checksum & 0xFFFF) + (checksum >> 16);
+	if ((checksum & 0xFFFF0000) > 0)
+		checksum = (checksum & 0xFFFF) + (checksum >> 16);
+	if ((checksum & 0xFFFF0000) > 0)
+		checksum = (checksum & 0xFFFF) + (checksum >> 16);
+	checksum = ((~checksum) & 0xFFFF);
+  printf("checksum: %d\n", checksum);
+	if (checksum == 0){
+		return 1;
+	}else{
+		return 0;
+	}		
+}
 void ipchecksum(unsigned char* ipraw){
   unsigned int checksum = 0;
   checksum += (ipraw[ 0] << 8) | ipraw[ 1]; // version, ihl and tos

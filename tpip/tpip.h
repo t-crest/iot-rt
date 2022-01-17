@@ -9,11 +9,9 @@
 #define TPIP_H
 
 // network buffer for one packet
-#define BUFSIZE (2000)
-
+#define BUFSIZE 2000
 // period length (ms). Can also be cycles if on 'bare metal'
 #define PERIOD 100 // 1000 // must be less than 2,147,483,647
-
 // used by 'int currenttimemillis()'
 #define CLOCKS_PER_MSEC (CLOCKS_PER_SEC / 1000)
 
@@ -24,8 +22,10 @@ typedef struct obb_t
     unsigned long flags;
 } obb_t;
 
+extern unsigned char my_ip[4];
+
 // UDP header: https://www.ietf.org/rfc/rfc768
-//  0      7 8     15 16    23 24    31
+//                0       7 8      15 16    23 24    31
 //                +--------+--------+--------+--------+
 //                |     Source      |   Destination   |
 //                |      Port       |      Port       |
@@ -93,7 +93,6 @@ typedef struct ip_t
 
 // It is "just" a naming instead of accessing a buff[0].
 
-
 typedef struct ip_t_ms {
   unsigned long length;
   //  |Version|  IHL  |Type of Service|          Total Length         |
@@ -109,18 +108,36 @@ typedef struct ip_t_ms {
 
 // loads a network buffer with an ip packet
 int packip(unsigned char *netbuf, const ip_t *ip);
-
 // unloads an ip packet from a network buffer
 void unpackip(ip_t *ip, const unsigned char *buf);
+// Prepare UDP packet
+int packudp();
+// Extract UDP packet from IP packet
+void unpackudp(udp_t *udp, const ip_t *ip);
 
-// print ip address
+// Print ip address, use the second one
 void printipaddr(unsigned long ip, char* ipstr);
-// and ip packet
+void tpip_print_ip(unsigned int ip);
+// Print ip packet
 void printipdatagram(ip_t *ip);
+// Print packet type :::::: didnot implement
+// void tpip_print_packet_type(enum eth_protocol type);
 
-// called after packip
+
+// IP Header verify checksum
+int tpip_verify_checksum(unsigned char* ip);
+// UDP Verify checksum
+int tpip_udp_verify_checksum(ip_t* ip) __attribute__((noinline));
+// called after packip, calculating checksum number, using with the buffer out
 void ipchecksum(unsigned char* ip);
-
+// Get length
+int tpip_get_length(unsigned char* bufin);
+// Load data into buffer from MAC 
+int tpip_load_bufin(unsigned int rx_addr, unsigned char* bufin);
+// Send data from buffer queues to ETHMAC buffer and send out
+int tpip_load_bufout(unsigned int tx_addr, unsigned char* bufout, unsigned int length);
+// Compare my ip and destination ip
+int tpip_compare_ip(unsigned char * my_ip, unsigned int destination_ip);
 #ifndef __patmos__
 #include <arpa/inet.h>
 #define NOTPATMOS 1

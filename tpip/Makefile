@@ -4,7 +4,7 @@ PATMOSHOME=~/t-crest/patmos
 SERIAL?=/dev/ttyUSB0
 LIBETH=$(PATMOSHOME)/c/ethlib
 TCP_ROLE=SERVER
-
+include $(PATMOSHOME)/c/Makefile
 # Flags for compiling normal applications
 # Assuming 2 MB of main memory
 CFLAGS?=-target patmos-unknown-unknown-elf -O2 \
@@ -19,7 +19,7 @@ CFLAGS?=-target patmos-unknown-unknown-elf -O2 \
 help:
 	# Make file for tpip
 	#   pcap: tcpdump stuff
-    #   wcet: wcet of one function and some png call graphs
+  	#   wcet: wcet of one function and some png call graphs
 	#   macrocheck: see how macros are tested
 	#   slip: (ms: will you write what it does?)
 	#   tpiphost: host listener (UDP on serial 2)
@@ -47,6 +47,8 @@ wcet:
 #use this target to see how macros are expanded
 macrocheck:
 	$(CC) -E *.c
+# Filter out unused files for tpip
+LIBTPIP = $(filter-out $(LIBETH)/arp.c $(LIBETH)/icmp.c $(LIBETH)/ipv4.c $(LIBETH)/ptp1588.c $(LIBETH)/tcp.c $(LIBETH)/tte.c $(LIBETH)/udp.c, $(LIBETH)/*.c)
 
 # library for ethernet
 .PHONY: libeth
@@ -59,15 +61,20 @@ slip:
 	./a.out /dev/ttyUSB0
 
 tpiphost:
-    #start listening on host
+    	#start listening on host
 	$(CC) slip.c tpip.c test_tpip.c
 	./a.out
 
 tpippatmos:
 	#start on patmos (a second terminal)
-	patmos-clang $(CFLAGS) $(LIBETH)/*.c slip.c obb_demo.c tpip.c -o obb_demo.elf
+	patmos-clang $(CFLAGS) $(LIBETH)/*.c slip.c tpip_demo.c tpip.c -o tpip_obb.elf
 	cd $(PATMOSHOME) && $(MAKE) config BOARD=altde2-all
-	patserdow -v /dev/ttyUSB0 obb_demo.elf
+	patserdow -v /dev/ttyUSB0 tpip_obb.elf
+
+tpipethpatmos:
+	patmos-clang $(CFLAGS) $(LIBTPIP) tpip_arp.c demo.c tpip.c -o eth_demo.elf
+	cd $(PATMOSHOME) && $(MAKE) config BOARD=altde2-all
+	patserdow -v /dev/ttyUSB0 eth_demo.elf
 
 tcphost-comp:
 	$(CC) -D $(TCP_ROLE) test_tcp_host.c -o test_tcp_host_$(TCP_ROLE).out
@@ -78,7 +85,7 @@ tcphost-run:
 tcppatmos-comp:
 	patmos-clang -D $(TCP_ROLE) $(CFLAGS) $(LIBETH)/*.c test_tcp_patmos.c -o test_tcp_patmos_$(TCP_ROLE).elf
 
-tcopatmos-run:
+tcppatmos-run:
 	cd $(PATMOSHOME) && $(MAKE) config BOARD=altde2-all
 	sleep 2
 	patserdow -v $(SERIAL) test_tcp_$(TCP_ROLE).elf
