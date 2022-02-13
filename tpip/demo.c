@@ -7,6 +7,7 @@
 #include "ethlib/mac.h"
 #include "ethlib/tpip.h"
 #include "ethlib/tpip_arp.h"
+#include "ethlib/tpip_icmp.h"
 
 #define LED (*((volatile _IODEV unsigned*)PATMOS_IO_LED ))
 
@@ -21,6 +22,7 @@ unsigned short int led_udp_port = 1234;
 void demo(){
     ip_t recv_ip_pck;
     arp_t recv_arp_packet;
+    ip_icmp icmp_recv;
     // unsigned char source_ip[4];
     // unsigned char source_mac[6];
     // unsigned char dest_ip[4];
@@ -32,6 +34,7 @@ void demo(){
     int udp_count = 0;
     int load_done = 0;
     int udp_data_length = 0;
+    int ip_checksum = 0;
    
     unsigned char ans;
 
@@ -41,6 +44,7 @@ void demo(){
     arp_table_init();
 
     for(int i = 0; i < 20; i++){
+        ans =0;
         // 1. receive the buffer: it should be loaded into ETH-MAC
         printf("\n Waiting for a packet, receive \n");
        
@@ -63,6 +67,38 @@ void demo(){
 			printf("\n- Notes:\n");
 			printf("  - No actions performed.\n");
 	    break;
+
+        case ICMP:  
+            ans = icmp_process_received(bufin, bufout, tx_addr);
+            icmp_load_ip(&icmp_recv, bufin+14);
+            printf("...packet #%d received!\n\n", i+1);
+            printf("Packet #%d info:\n", i+1);
+            printf("- Level 2 protocol: Ethernet\n");
+            printf("\n- Level 3 protocol: IP\n");
+            
+            printf("  - Source IP: ");
+            tpip_print_ip(icmp_recv.srcip);
+            printf("\n  - Destination IP: ");
+            tpip_print_ip(icmp_recv.dstip);
+            
+            ip_checksum = tpip_verify_checksum(bufin);
+            if(ip_checksum == 1){
+                printf(" [OK]\n");
+            }else{
+                printf(" [WRONG]\n");
+                printf("\n- Notes:\n");
+				printf("  - Wrong IP checksum, no actions performed.\n");
+				continue;
+            }
+            printf("\n- Level 3 protocol: ICMP\n");
+            if (ans == 0){
+                printf("\n- Notes:\n");
+                printf("  - ICMP packet not our IP or not a ping request, no actions performed.\n");
+            }else{
+                printf("\n- Notes:\n");
+                printf("  - Ping to our IP, replied.\n");
+            }
+        break;
         
         case UDP:
             printf("Now the received data should be in the bufin \n");
@@ -83,7 +119,7 @@ void demo(){
                 printf(" [BROADCAST]");
             }
             // checksum
-            int ip_checksum = 0;
+            
             printf("\n  - IP checksum: %04x", recv_ip_pck.checksum);
             ip_checksum = tpip_verify_checksum(bufin);
             if(ip_checksum == 1){
@@ -185,7 +221,7 @@ void demo(){
 
 
 int main(){
-    LED = 0X00;
+    //LED = 0X00;
     char c;
     printf("Test: TPIP + ETH PROTOCOL \n");
 

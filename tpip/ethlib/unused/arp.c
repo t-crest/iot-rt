@@ -39,78 +39,8 @@
  *          Russell Barnes
  */
 
-#include "tpip_arp.h"
+#include "arp.h"
 
-
-////////////////////////////////////////////////////
-// Extract the ARP frame from receive buffer
-////////////////////////////////////////////////////
-__attribute__((noinline)) 
-void arp_unpack(arp_t *arp, unsigned char *buf){
-  buf = buf + 14; // Avoid the Ethernet header
-  arp->HT = *buf << 8 | *(buf+1); buf++; buf++;
-  arp->PT = *buf << 8 | *(buf+1); buf++; buf++;
-  arp->HAL = *buf; buf++;
-  arp->PAL = *buf; buf++;
-  arp->OP = *buf << 8 | *(buf+1); buf++; buf++;
-  for(int i = 0; i < 6; i++){
-    arp->S_HA[i] = *buf; 
-    buf++;
-  } 
-  arp->S_L32 = *buf << 24 | *(++buf) << 16 | *(++buf) << 8 | *(++buf);
-  buf++;
-  for(int i = 0; i < 6; i++){
-    arp->T_HA[i] = *buf; 
-    buf++;
-  } 
-  arp->T_L32 = *buf << 24 | *(++buf) << 16 | *(++buf) << 8 | *(++buf);
-  
-}
-
-//Print out the ARP packet
-void arp_packet_print(arp_t *arp){
-	printf("arp->HT    = 0x%04x\n", arp->HT);
-	printf("arp->PT    = 0x%04x\n", arp->PT);
-	printf("arp->HAL   = 0x%02x (%d)\n", arp->HAL, arp->HAL);
-	printf("arp->PAL   = 0x%02x (%d)\n", arp->PAL, arp->PAL);
-	printf("arp->OP    = 0x%04x\n", arp->OP);
-	printf("arp->S_HA(Sender MAC)  = 0x");
-	for(int i=0;i<6;i++){
-		printf("%02x ", arp->S_HA[i]);
-	}
-	char arpstr[20]; 
-	printipaddr(arp->S_L32, arpstr);
-	printf("\n arp->S_L32(Sender IP)  = 0x%08lx (%s)\n", arp->S_L32, arpstr);
-	printf("arp->T_HA(Target MAC)  = 0x");
-	for(int i=0;i<6;i++){
-		printf("%02x ", arp->T_HA[i]);
-	}
-	printipaddr(arp->T_L32, arpstr);
-	printf("\n arp->T_L32(Target IP)  = 0x%08lx (%s)\n", arp->T_L32, arpstr);
-
-	return;
-}
-
-void arp_pack(unsigned char *buf, arp_t *arp){
-	
-}
-void arp_uint2char(unsigned char *target, uint32_t ipnum){
-	for(int i = 0; i < 4; i++){
-		target[i] = ipnum >> (24-8*i);
-	}
-	return;
-}
-///////////////////////////////////////////////////////////////
-//Function supporting IPV4 function
-///////////////////////////////////////////////////////////////
-//This function compare 2 IPs. If they are the same, it returns 1, otherwise 0.
-int ipv4_compare_ip(unsigned char ip1[], unsigned char ip2[]){
-	if(ip1[0] == ip2[0] && ip1[1] == ip2[1] && ip1[2] == ip2[2] && ip1[3] == ip2[3]){
-		return 1;
-	}else{
-		return 0;
-	}
-}
 ///////////////////////////////////////////////////////////////
 //Functions related to the ARP table
 ///////////////////////////////////////////////////////////////
@@ -132,7 +62,6 @@ void arp_table_init(){
 }
 
 //This function searches in the ARP table for the given IP. If it exists it returns 1 and the MAC. If not it returns 0.
-__attribute__((noinline)) 
 int arp_table_search(unsigned char ip_addr[], unsigned char mac_addr[]){
 	#pragma loopbound min ARP_TABLE_SIZE max ARP_TABLE_SIZE
 	for (int i=0; i<ARP_TABLE_SIZE; i++){
@@ -196,79 +125,105 @@ void arp_table_print(){
 	return;
 }
 
+///////////////////////////////////////////////////////////////
+//Functions to get the ARP protocol field
+///////////////////////////////////////////////////////////////
+
+//This function get the ARP target IP.
+void arp_get_target_ip(unsigned int pkt_addr, unsigned char target_ip[]){
+	for (int i=0; i<4; i++){
+		target_ip[i] = mem_iord_byte(pkt_addr+38+i);
+	}	
+	return;
+}
+
+//This function get the ARP target IP.
+void arp_get_target_mac(unsigned int pkt_addr, unsigned char target_mac[]){
+	for (int i=0; i<6; i++){
+		target_mac[i] = mem_iord_byte(pkt_addr+32+i);
+	}	
+	return;
+}
+
+//This function get the ARP target MAC.
+void arp_get_sender_ip(unsigned int pkt_addr, unsigned char sender_ip[]){
+	for (int i=0; i<4; i++){
+		sender_ip[i] = mem_iord_byte(pkt_addr+28+i);
+	}	
+	return;
+}
+
+//This function get the ARP sender IP.
+unsigned short int arp_get_operation(unsigned int pkt_addr){
+	unsigned short int operation;
+	operation = (mem_iord_byte(pkt_addr + 20) << 8) + (mem_iord_byte(pkt_addr + 21) & 0xFF);
+	return operation;
+}
+
+//This function get the ARP sender MAC.
+void arp_get_sender_mac(unsigned int pkt_addr, unsigned char sender_mac[]){
+	for (int i=0; i<6; i++){
+		sender_mac[i] = mem_iord_byte(pkt_addr+22+i);
+	}	
+	return;
+}
 
 ///////////////////////////////////////////////////////////////
 //Support functions related to the ARP protocol
 ///////////////////////////////////////////////////////////////
 
-//This function takes the received ARP request packet starting in rx_addr and builds 
-//a reply packet starting in tx_addr. rx_addr and tx_addr can be the same.
-__attribute__((noinline)) 
-unsigned int arp_build_reply(unsigned char *bufin, unsigned char *bufout){
+//This function takes the received ARP request packet starting in rx_addr and builds a reply packet starting in tx_addr. rx_addr and tx_addr can be the same.
+unsigned int arp_build_reply(unsigned int rx_addr, unsigned int tx_addr){
 
-	unsigned int frame_length = 42;//ARP frames have a fixed length, ARP+ETH header
+	unsigned int frame_length = 42;//ARP frames have a fixed length
 	
 	//Copy the entire frame	
-	#pragma loopbound min 42 max 42
-	for(int i=0; i<frame_length; i++){
-		*(bufout+i) = *(bufin+i); 
+	if (rx_addr != tx_addr ){ 
+		for(int i=0; i<frame_length; i++){
+			mem_iowr_byte(tx_addr + i, mem_iord_byte(rx_addr + i));
+		}
 	}
-	
 	//Swap MAC addrs in ethernet header
 	for (int i=0; i<6; i++){
-		*(bufout + i) = *(bufout + i + 6);
-		*(bufout + i + 6) = my_mac[i];
-		//printf("bufout[%d]: %d ",i,bufout[i]);
+		mem_iowr_byte(tx_addr + i, mem_iord_byte(tx_addr+6+i));
+		mem_iowr_byte(tx_addr + 6 + i, my_mac[i]);
 	}
-	//printf("\n");
 	//Change ARP Operation type from request to reply
-	*(bufout + 21) = 2;
+	mem_iowr_byte(tx_addr + 21, 2);
 	//Swap MAC addrs
 	for (int i=0; i<6; i++){
-		*(bufout + 32 + i) = *(bufout + 22 + i);
-		*(bufout + 22 + i) = my_mac[i];
+		mem_iowr_byte(tx_addr + 32 + i, mem_iord_byte(tx_addr+22+i));
+		mem_iowr_byte(tx_addr + 22 + i, my_mac[i]);
 	}
 	//Swap IP addr
 	for (int i=0; i<4; i++){
-		bufout[38+i] = bufout[28+i];
-		bufout[28+i] = my_ip[i];
+		mem_iowr_byte(tx_addr + 38 + i, mem_iord_byte(tx_addr+28+i));
+		mem_iowr_byte(tx_addr + 28 + i, my_ip[i]);
 	}
 	return frame_length;
 }
 
-//This function process a received ARP package. If it is a request and we are the destination (IP) 
-//it reply the ARP request and returns 1. If it is a reply and we are the destination (IP) it inserts 
-//an entry in the ARP table and returns 2. Otherwise it returns 0.
-int arp_process_received(unsigned char *bufin, unsigned char *bufout, unsigned int tx_addr){
+//This function process a received ARP package. If it is a request and we are the destination (IP) it reply the ARP request and returns 1. If it is a reply and we are the destination (IP) it inserts an entry in the ARP table and returns 2. Otherwise it returns 0.
+int arp_process_received(unsigned int rx_addr, unsigned int tx_addr){
 	//Check if we are the destnation (IP)
-	arp_t arp;
-	int load_success = 0;
 	unsigned char target_ip[4];
-	unsigned char source_ip[4];
-	arp_unpack(&arp, bufin);
-	arp_uint2char(target_ip, arp.T_L32);
-	arp_uint2char(source_ip, arp.S_L32);
-	printf("TARGET IP: ");
-	for(int i = 0; i < 4; i++){
-		printf(" %d ", target_ip[i]);
-	}
+	arp_get_target_ip(rx_addr, target_ip);
 	if (ipv4_compare_ip(target_ip, my_ip) == 1){
 		//Check if it is a arp request
-		if (arp.OP == 0x01){		
-			unsigned int frame_length = arp_build_reply(bufin, bufout);
-			printf("\n ARP frame length: %d\n", frame_length);
-			// Load data from buffer out to the HW buffer
-			load_success = tpip_load_bufout(tx_addr, bufout, frame_length);
-			if(load_success == 1) {
-				eth_mac_send(tx_addr, frame_length);
-				return 1;
-			}
-			else return 0;
-			
-		}else if (arp.OP == 0x02){ // ARP is a reply
-			if(mac_compare_mac(arp.T_HA, my_mac) == 1){
+		if (mem_iord_byte(rx_addr + 21) == 0x01){		
+			unsigned int frame_length = arp_build_reply(rx_addr, tx_addr);
+			eth_mac_send(tx_addr, frame_length);
+			return 1;
+		}else if (mem_iord_byte(rx_addr + 21) == 0x02){
+			unsigned char target_mac[6];
+			arp_get_target_mac(rx_addr, target_mac);
+			if(mac_compare_mac(target_mac, my_mac) == 1){
 				//insert an entry
-				arp_table_new_entry(source_ip, arp.S_HA);
+				unsigned char sender_ip[4];
+				unsigned char sender_mac[6];
+				arp_get_sender_ip(rx_addr, sender_ip);
+				arp_get_sender_mac(rx_addr, sender_mac);
+				arp_table_new_entry(sender_ip, sender_mac);
 				return 2;
 			}else{
 				return 0;
@@ -308,7 +263,7 @@ unsigned int arp_build_request(unsigned int tx_addr, unsigned char target_ip[]){
 }
 
 //This function tries to resolves an ip address in the time specified by timeout (us). It waits for an answer for at least 100000us, hence if nobody replies it returns after 100000us, indipendently by the timeout. It requires a rx and a tx addr to send and receive packets.
-int arp_resolve_ip(unsigned char* bufin, unsigned char* bufout, unsigned int rx_addr, unsigned int tx_addr, unsigned char target_ip[], long long unsigned int timeout){
+int arp_resolve_ip(unsigned int rx_addr, unsigned int tx_addr, unsigned char target_ip[], long long unsigned int timeout){
 	unsigned char ans = 0;
 	unsigned int frame_length;
 	unsigned long long int start_time = get_cpu_usecs();
@@ -317,8 +272,7 @@ int arp_resolve_ip(unsigned char* bufin, unsigned char* bufout, unsigned int rx_
 		eth_mac_send(tx_addr, frame_length);
 		if (eth_mac_receive(rx_addr, 100000) == 1){
 			if (mac_packet_type(rx_addr) == ARP){
-				tpip_load_bufin(rx_addr, bufin);
-				if (arp_process_received(bufin, bufout, tx_addr) == 2){
+				if (arp_process_received(rx_addr, tx_addr) == 2){
 					//Something was inserted in the ARP table
 					unsigned char tmp_mac[6];
 					if (arp_table_search(target_ip, tmp_mac) == 1){
